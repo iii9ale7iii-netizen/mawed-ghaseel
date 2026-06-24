@@ -40,8 +40,28 @@ class CustomerNotificationsScreen extends StatelessWidget {
   bool canCustomerSeeNotification(Map<String, dynamic> data) {
     final target = data['target']?.toString() ?? 'all';
     final isActive = data['isActive'] == true;
+    final type = data['type']?.toString() ?? '';
+    final customerId = SessionService.currentCustomerId ?? '';
 
-    return isActive && (target == 'all' || target == 'customers');
+    if (!isActive) return false;
+
+    if (type == 'paid_ad') {
+      return target == 'all' ||
+          target == 'customers' ||
+          target == 'customer' ||
+          target == 'specific_customer' ||
+          target == 'العملاء' ||
+          target == 'الكل' ||
+          target.isEmpty;
+    }
+
+    return target == 'all' ||
+        target == 'customers' ||
+        target == 'customer' ||
+        target == 'العملاء' ||
+        target == 'الكل' ||
+        (target == 'specific_customer' &&
+            data['customerId']?.toString() == customerId);
   }
 
   String formatDate(dynamic value) {
@@ -51,6 +71,26 @@ class CustomerNotificationsScreen extends StatelessWidget {
     }
 
     return '';
+  }
+
+  Widget notificationBadge(Map<String, dynamic> data) {
+    final type = data['type']?.toString() ?? '';
+
+    if (type == 'paid_ad') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade700,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'إعلان ممول',
+          style: TextStyle(color: Colors.white, fontSize: 11),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   @override
@@ -106,16 +146,24 @@ class CustomerNotificationsScreen extends StatelessWidget {
                               : Icons.notifications_active,
                           color: isRead ? Colors.grey : Colors.blue,
                         ),
-                        title: Text(
-                          data['title'] ?? '',
-                          style: TextStyle(
-                            fontWeight: isRead
-                                ? FontWeight.normal
-                                : FontWeight.bold,
-                          ),
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            notificationBadge(data),
+                            if ((data['type']?.toString() ?? '') == 'paid_ad')
+                              const SizedBox(height: 6),
+                            Text(
+                              data['title']?.toString() ?? '',
+                              style: TextStyle(
+                                fontWeight: isRead
+                                    ? FontWeight.normal
+                                    : FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Text(
-                          '${data['body'] ?? ''}\n${formatDate(data['createdAt'])}',
+                          '${data['body']?.toString() ?? ''}\n${formatDate(data['createdAt'])}',
                         ),
                         isThreeLine: true,
                         trailing: isRead

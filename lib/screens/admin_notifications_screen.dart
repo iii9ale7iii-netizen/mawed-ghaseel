@@ -12,15 +12,32 @@ class AdminNotificationsScreen extends StatefulWidget {
 class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   final titleController = TextEditingController();
   final bodyController = TextEditingController();
+  final paidAmountController = TextEditingController();
 
-  String target = 'all';
+  String target = 'customers';
+  String selectedWashId = '';
+  String selectedWashName = '';
   bool isLoading = false;
 
-  Future<void> addNotification() async {
-    if (titleController.text.isEmpty || bodyController.text.isEmpty) {
+  Future<void> addPaidAd() async {
+    if (titleController.text.trim().isEmpty ||
+        bodyController.text.trim().isEmpty ||
+        selectedWashId.isEmpty ||
+        paidAmountController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى إدخال العنوان ونص الإعلان')),
+        const SnackBar(
+          content: Text('يرجى تعبئة العنوان والنص واختيار المغسلة والمبلغ'),
+        ),
       );
+      return;
+    }
+
+    final paidAmount = double.tryParse(paidAmountController.text.trim());
+
+    if (paidAmount == null || paidAmount <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('يرجى إدخال مبلغ صحيح')));
       return;
     }
 
@@ -32,23 +49,36 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       'title': titleController.text.trim(),
       'body': bodyController.text.trim(),
       'target': target,
-      'createdAt': Timestamp.now(),
+      'type': 'paid_ad',
+      'washId': selectedWashId,
+      'washName': selectedWashName,
+      'paidAmount': paidAmount,
       'isActive': true,
+      'createdAt': Timestamp.now(),
     });
 
     titleController.clear();
     bodyController.clear();
+    paidAmountController.clear();
 
     setState(() {
-      target = 'all';
+      target = 'customers';
+      selectedWashId = '';
+      selectedWashName = '';
       isLoading = false;
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم إضافة الإعلان بنجاح')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إضافة الإعلان المدفوع بنجاح')),
+      );
     }
+  }
+
+  Future<void> toggleNotification(String id, bool currentValue) async {
+    await FirebaseFirestore.instance.collection('notifications').doc(id).update(
+      {'isActive': !currentValue},
+    );
   }
 
   Future<void> deleteNotification(String id) async {
@@ -64,6 +94,19 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     return 'الكل';
   }
 
+  String typeText(String value) {
+    if (value == 'paid_ad') return 'إعلان مدفوع';
+    return 'إعلان عام';
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    bodyController.dispose();
+    paidAmountController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -73,10 +116,74 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const Text(
+              'إضافة إعلان مدفوع للمغاسل',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(height: 15),
+
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('washes')
+                  .where('status', isEqualTo: 'approved')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final washes = snapshot.data!.docs;
+
+                if (washes.isEmpty) {
+                  return const Text('لا توجد مغاسل معتمدة حالياً');
+                }
+
+                return DropdownButtonFormField<String>(
+                  value: selectedWashId.isEmpty ? null : selectedWashId,
+                  decoration: const InputDecoration(
+                    labelText: 'اختر المغسلة المعلنة',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: washes.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final washName =
+                        data['washName']?.toString() ??
+                        data['name']?.toString() ??
+                        'مغسلة بدون اسم';
+
+                    return DropdownMenuItem<String>(
+                      value: doc.id,
+                      child: Text(washName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    final selectedDoc = washes.firstWhere(
+                      (doc) => doc.id == value,
+                    );
+                    final data = selectedDoc.data() as Map<String, dynamic>;
+
+                    setState(() {
+                      selectedWashId = value;
+                      selectedWashName =
+                          data['washName']?.toString() ??
+                          data['name']?.toString() ??
+                          'مغسلة بدون اسم';
+                    });
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
                 labelText: 'عنوان الإعلان',
+                hintText: 'مثال: خصم 30% على الغسيل الخارجي',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -88,7 +195,21 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'نص الإعلان',
+                hintText: 'اكتب تفاصيل العرض الذي سيظهر للعملاء',
                 border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: paidAmountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'المبلغ المدفوع للإعلان',
+                hintText: 'مثال: 150',
+                border: OutlineInputBorder(),
+                suffixText: 'ريال',
               ),
             ),
 
@@ -97,17 +218,16 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             DropdownButtonFormField<String>(
               value: target,
               decoration: const InputDecoration(
-                labelText: 'الفئة المستهدفة',
+                labelText: 'الفئة التي سيظهر لها الإعلان',
                 border: OutlineInputBorder(),
               ),
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('الكل')),
                 DropdownMenuItem(value: 'customers', child: Text('العملاء')),
-                DropdownMenuItem(value: 'washes', child: Text('المغاسل')),
+                DropdownMenuItem(value: 'all', child: Text('الكل')),
               ],
               onChanged: (value) {
                 setState(() {
-                  target = value!;
+                  target = value ?? 'customers';
                 });
               },
             ),
@@ -117,10 +237,10 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: isLoading ? null : addNotification,
+                onPressed: isLoading ? null : addPaidAd,
                 child: isLoading
                     ? const CircularProgressIndicator()
-                    : const Text('إضافة الإعلان'),
+                    : const Text('إضافة الإعلان المدفوع'),
               ),
             ),
 
@@ -153,16 +273,54 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                   children: notifications.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
 
+                    final isActive = data['isActive'] == true;
+                    final type = data['type']?.toString() ?? 'general';
+                    final paidAmount = data['paidAmount'] ?? 0;
+
                     return Card(
-                      child: ListTile(
-                        title: Text(data['title'] ?? ''),
-                        subtitle: Text(
-                          '${data['body'] ?? ''}\nالفئة: ${targetText(data['target'] ?? 'all')}',
-                        ),
-                        isThreeLine: true,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => deleteNotification(doc.id),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              title: Text(
+                                data['title'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${data['body'] ?? ''}\n'
+                                'النوع: ${typeText(type)}\n'
+                                'المغسلة: ${data['washName'] ?? '-'}\n'
+                                'الفئة: ${targetText(data['target'] ?? 'all')}\n'
+                                'المبلغ: $paidAmount ريال\n'
+                                'الحالة: ${isActive ? 'فعال' : 'غير فعال'}',
+                              ),
+                              isThreeLine: true,
+                            ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SwitchListTile(
+                                    title: Text(isActive ? 'فعال' : 'غير فعال'),
+                                    value: isActive,
+                                    onChanged: (_) {
+                                      toggleNotification(doc.id, isActive);
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => deleteNotification(doc.id),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     );

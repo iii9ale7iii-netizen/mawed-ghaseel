@@ -78,7 +78,11 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 18),
                 const Row(
                   children: [
-                    Icon(Icons.headset_mic, color: AppColors.primary, size: 30),
+                    Icon(
+                      Icons.support_agent_rounded,
+                      color: AppColors.primary,
+                      size: 30,
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'الشكاوى والاقتراحات',
@@ -197,16 +201,16 @@ class WelcomeScreen extends StatelessWidget {
 
   Widget buildLogo() {
     return Container(
-      width: 112,
-      height: 112,
+      width: 118,
+      height: 118,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withOpacity(0.94),
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.22)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.22),
-            blurRadius: 22,
+            color: AppColors.primary.withOpacity(0.20),
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -214,18 +218,52 @@ class WelcomeScreen extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  AppColors.primaryDark,
+                  AppColors.primary,
+                  const Color(0xFF38BDF8),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+          ),
           const Icon(
-            Icons.directions_car_filled,
-            size: 52,
-            color: AppColors.primaryDark,
+            Icons.directions_car_rounded,
+            size: 42,
+            color: Colors.white,
           ),
           Positioned(
-            top: 24,
+            top: 27,
             right: 28,
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary.withOpacity(0.20)),
+              ),
+              child: const Icon(
+                Icons.water_drop_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 29,
+            left: 28,
             child: Icon(
-              Icons.water_drop,
-              color: AppColors.primary.withOpacity(0.9),
-              size: 24,
+              Icons.auto_awesome,
+              color: AppColors.primary.withOpacity(0.85),
+              size: 19,
             ),
           ),
         ],
@@ -345,39 +383,61 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
             Positioned.fill(
-              child: Container(color: Colors.white.withOpacity(0.10)),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.02),
+                      Colors.white.withOpacity(0.10),
+                    ],
+                  ),
+                ),
+              ),
             ),
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.white.withOpacity(0.92),
-                          child: IconButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('لا توجد إشعارات حالياً'),
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.notifications,
-                              color: AppColors.primaryDark,
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.92),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.07),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
                             ),
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('لا توجد إشعارات حالياً'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.notifications_rounded,
+                            color: AppColors.primaryDark,
                           ),
                         ),
-                        const Spacer(),
-                      ],
+                      ),
                     ),
                     Expanded(
                       child: Center(
                         child: SingleChildScrollView(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 440),
+                            constraints: const BoxConstraints(maxWidth: 430),
                             child: Column(
                               children: [
                                 buildLogo(),
@@ -501,33 +561,64 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.82),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Row(
-                        children: [
-                          TextButton.icon(
-                            onPressed: () => showSupportSheet(context),
-                            icon: const Icon(Icons.headset_mic),
-                            label: const Text('الشكاوى والاقتراحات'),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.88),
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.72),
                           ),
-                          const Spacer(),
-                          const Text(
-                            'منصة مخصصة لتنظيم حجوزات\nمغاسل السيارات',
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              height: 1.4,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.07),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => showSupportSheet(context),
+                              icon: const Icon(
+                                Icons.support_agent_rounded,
+                                size: 21,
+                              ),
+                              label: const Text(
+                                'الشكاوى والاقتراحات',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              width: 1,
+                              height: 38,
+                              color: AppColors.border,
+                            ),
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Text(
+                                'منصة مخصصة لتنظيم حجوزات\nمغاسل السيارات',
+                                textAlign: TextAlign.left,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

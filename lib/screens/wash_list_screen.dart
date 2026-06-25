@@ -89,7 +89,7 @@ class WashListScreen extends StatelessWidget {
     bool isSponsored,
   ) {
     final washName =
-        data['washName']?.toString() ?? data['name']?.toString() ?? '';
+        data['washName']?.toString() ?? data['name']?.toString() ?? 'مغسلة';
     final statusText = WorkingHoursService.washStatusText(data);
     final canBook = WorkingHoursService.isOpenAt(
       washData: data,
@@ -144,21 +144,29 @@ class WashListScreen extends StatelessWidget {
             ),
           ],
         ),
-        trailing: ElevatedButton(
-          onPressed: canBook
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ServiceSelectionScreen(
-                        washId: wash.id,
-                        washName: washName,
+        trailing: SizedBox(
+          width: 90,
+          height: 40,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(90, 40),
+              padding: EdgeInsets.zero,
+            ),
+            onPressed: canBook
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ServiceSelectionScreen(
+                          washId: wash.id,
+                          washName: washName,
+                        ),
                       ),
-                    ),
-                  );
-                }
-              : null,
-          child: const Text('اختيار'),
+                    );
+                  }
+                : null,
+            child: const Text('اختيار'),
+          ),
         ),
       ),
     );

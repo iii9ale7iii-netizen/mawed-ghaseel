@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/session_service.dart';
+import '../services/working_hours_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final String washId;
@@ -23,6 +25,9 @@ class _BookingScreenState extends State<BookingScreen> {
   final TextEditingController timeController = TextEditingController();
   final TextEditingController couponController = TextEditingController();
 
+  DateTime? selectedDate;
+  TimeOfDay? selectedTime;
+
   bool isLoading = false;
   bool isCheckingCoupon = false;
 
@@ -31,15 +36,16 @@ class _BookingScreenState extends State<BookingScreen> {
   bool couponApplied = false;
 
   Future<void> selectDate() async {
-    DateTime? pickedDate = await showDatePicker(
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2030),
     );
 
     if (pickedDate != null) {
       setState(() {
+        selectedDate = pickedDate;
         dateController.text =
             '${pickedDate.day}/${pickedDate.month}/${pickedDate.year}';
       });
@@ -47,16 +53,117 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> selectTime() async {
-    TimeOfDay? pickedTime = await showTimePicker(
+    final pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: selectedTime ?? TimeOfDay.now(),
     );
 
     if (pickedTime != null && mounted) {
       setState(() {
+        selectedTime = pickedTime;
         timeController.text = pickedTime.format(context);
       });
     }
+  }
+
+  DateTime? selectedBookingDateTime() {
+    if (selectedDate == null || selectedTime == null) return null;
+
+    return DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      selectedTime!.hour,
+      selectedTime!.minute,
+    );
+  }
+
+  Future<bool> validateWorkingHours() async {
+    final bookingDateTime = selectedBookingDateTime();
+
+    if (bookingDateTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى اختيار التاريخ والوقت')),
+      );
+      return false;
+    }
+
+    final washDoc = await FirebaseFirestore.instance
+        .collection('washes')
+        .doc(widget.washId)
+        .get();
+
+    if (!washDoc.exists) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('المغسلة غير موجودة')));
+      return false;
+    }
+
+    final washData = washDoc.data() ?? {};
+
+    final bookingEnabled = WorkingHoursService.isWashBookingEnabled(washData);
+
+    if (!bookingEnabled) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('المغسلة لا تستقبل حجوزات حالياً')),
+      );
+      return false;
+    }
+
+    final workingHours = WorkingHoursService.getWorkingHours(washData);
+    final dayKey = WorkingHoursService.dayKeyFromDate(bookingDateTime);
+    final dayDataRaw = workingHours[dayKey];
+
+    if (dayDataRaw is! Map) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد أوقات عمل لهذا اليوم')),
+      );
+      return false;
+    }
+
+    final dayData = Map<String, dynamic>.from(dayDataRaw);
+    final dayEnabled = dayData['enabled'] == true;
+
+    if (!dayEnabled) {
+      if (!mounted) return false;
+
+      final dayName = WorkingHoursService.arabicDayName(dayKey);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('المغسلة مغلقة يوم $dayName')));
+      return false;
+    }
+
+    final from = dayData['from']?.toString() ?? '00:00';
+    final to = dayData['to']?.toString() ?? '00:00';
+
+    final isOpen = WorkingHoursService.isOpenAt(
+      washData: washData,
+      dateTime: bookingDateTime,
+    );
+
+    if (!isOpen) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'الوقت المختار خارج أوقات العمل. وقت العمل من $from إلى $to',
+          ),
+        ),
+      );
+      return false;
+    }
+
+    return true;
   }
 
   Future<void> applyCoupon() async {
@@ -137,6 +244,17 @@ class _BookingScreenState extends State<BookingScreen> {
       setState(() {
         isLoading = true;
       });
+
+      final isValidWorkingTime = await validateWorkingHours();
+
+      if (!mounted) return;
+
+      if (!isValidWorkingTime) {
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
 
       final existingBookings = await FirebaseFirestore.instance
           .collection('bookings')

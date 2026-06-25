@@ -4,9 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../main.dart';
 import '../services/session_service.dart';
+import '../services/ads_service.dart';
 import 'my_bookings_screen.dart';
 import 'wash_list_screen.dart';
 import 'customer_notifications_screen.dart';
+import 'service_selection_screen.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({super.key});
@@ -24,47 +26,6 @@ class CustomerHomeScreen extends StatelessWidget {
       MaterialPageRoute(builder: (context) => const WelcomeScreen()),
       (route) => false,
     );
-  }
-
-  bool _isPaidAd(Map<String, dynamic> data) {
-    final type = data['type']?.toString() ?? '';
-    return type == 'paid_ad' || data.containsKey('paidAmount');
-  }
-
-  bool _isActiveAd(Map<String, dynamic> data) {
-    if (data.containsKey('isActive')) {
-      return data['isActive'] == true;
-    }
-    return true;
-  }
-
-  bool _isAdVisibleByDate(Map<String, dynamic> data) {
-    final now = DateTime.now();
-
-    final startAt = data['startAt'];
-    if (startAt is Timestamp && startAt.toDate().isAfter(now)) {
-      return false;
-    }
-
-    final endAt = data['endAt'];
-    if (endAt is Timestamp && endAt.toDate().isBefore(now)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  bool _isAdForCustomers(Map<String, dynamic> data) {
-    final target = data['target']?.toString() ?? '';
-
-    if (target.isEmpty) return true;
-
-    return target == 'all' ||
-        target == 'customers' ||
-        target == 'customer' ||
-        target == 'specific_customer' ||
-        target == 'العملاء' ||
-        target == 'الكل';
   }
 
   Stream<int> unreadNotificationsCountStream() async* {
@@ -158,10 +119,123 @@ class CustomerHomeScreen extends StatelessWidget {
     );
   }
 
+  Widget paidAdCard(BuildContext context, Map<String, dynamic> adData) {
+    final title = adData['title']?.toString() ?? 'عرض خاص';
+    final body = adData['body']?.toString() ?? '';
+    final washId = adData['washId']?.toString() ?? '';
+    final washName = adData['washName']?.toString() ?? 'مغسلة';
+    final startDate = AdsService.formatDate(adData['startAt']);
+    final endDate = AdsService.formatDate(adData['endAt']);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.amber.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade700,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Text(
+                  'إعلان ممول',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  washName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Icon(Icons.local_car_wash, color: Colors.orange),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(body, style: const TextStyle(fontSize: 14, height: 1.4)),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.date_range, size: 18, color: Colors.orange),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'مدة العرض: $startDate إلى $endDate',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: washId.isEmpty
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ServiceSelectionScreen(
+                            washId: washId,
+                            washName: washName,
+                          ),
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('احجز الآن'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget paidAdsSection() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('notifications')
+          .where('type', isEqualTo: 'paid_ad')
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -181,12 +255,7 @@ class CustomerHomeScreen extends StatelessWidget {
         final allDocs = snapshot.data?.docs ?? [];
 
         final ads = allDocs.where((doc) {
-          final data = doc.data();
-
-          return _isPaidAd(data) &&
-              _isActiveAd(data) &&
-              _isAdVisibleByDate(data) &&
-              _isAdForCustomers(data);
+          return AdsService.isCurrentlyActivePaidAd(doc.data());
         }).toList();
 
         ads.sort((a, b) {
@@ -208,93 +277,12 @@ class CustomerHomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'إعلانات ممولة',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              'عروض ممولة',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 145,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: ads.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final data = ads[index].data();
-
-                  final title = data['title']?.toString() ?? 'إعلان';
-                  final body = data['body']?.toString() ?? '';
-                  final washName =
-                      data['washName']?.toString() ?? 'مغسلة معلنة';
-
-                  return Container(
-                    width: 280,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.amber.shade400),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade700,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'إعلان ممول',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                washName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Expanded(
-                          child: Text(
-                            body,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 18),
+            ...ads.map((doc) => paidAdCard(context, doc.data())),
+            const SizedBox(height: 8),
           ],
         );
       },

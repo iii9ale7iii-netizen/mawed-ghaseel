@@ -6,6 +6,7 @@ import '../main.dart';
 import '../services/session_service.dart';
 import 'service_management_screen.dart';
 import 'wash_notifications_screen.dart';
+import 'working_hours_screen.dart';
 
 class WashHomeScreen extends StatefulWidget {
   const WashHomeScreen({super.key});
@@ -185,6 +186,155 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     return Colors.orange;
   }
 
+  Widget managementButtons() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.design_services),
+              label: const Text('إدارة الخدمات'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ServiceManagementScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.access_time),
+              label: const Text('أوقات العمل واستقبال الحجوزات'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WorkingHoursScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget bookingCard(QueryDocumentSnapshot booking) {
+    final data = booking.data() as Map<String, dynamic>;
+    final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 15),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.calendar_month),
+              title: Text(data['customerName'] ?? ''),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('الخدمة: ${data['serviceName'] ?? ''}'),
+                  Text('التاريخ: ${data['date'] ?? ''}'),
+                  Text('الوقت: ${data['time'] ?? ''}'),
+                  if (data['hasDiscount'] == true) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'كود الخصم: ${data['couponCode'] ?? ''}',
+                      style: const TextStyle(color: Colors.green),
+                    ),
+                    Text(
+                      'نسبة الخصم: ${data['discountPercentage'] ?? 0}%',
+                      style: const TextStyle(color: Colors.green),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Chip(
+              label: Text(status),
+              backgroundColor: statusColor(status),
+              labelStyle: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 15),
+            if (status == 'بانتظار الموافقة') ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        updateStatus(booking.id, 'مقبول', data);
+                      },
+                      child: const Text('قبول'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () {
+                        updateStatus(booking.id, 'مرفوض', data);
+                      },
+                      child: const Text('رفض'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget bookingsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .where('washId', isEqualTo: SessionService.currentWashId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return SliverFillRemaining(
+            child: Center(child: Text('حدث خطأ: ${snapshot.error}')),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SliverFillRemaining(
+            child: Center(child: Text('لا توجد طلبات حالياً')),
+          );
+        }
+
+        final bookings = snapshot.data!.docs;
+
+        return SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return bookingCard(bookings[index]);
+          }, childCount: bookings.length),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -195,117 +345,26 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
           centerTitle: true,
           actions: [
             notificationButton(context),
-            IconButton(
-              icon: const Icon(Icons.design_services),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ServiceManagementScreen(),
-                  ),
-                );
-              },
-            ),
             IconButton(icon: const Icon(Icons.logout), onPressed: logout),
           ],
         ),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('bookings')
-              .where('washId', isEqualTo: SessionService.currentWashId)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (snapshot.hasError) {
-              return Center(child: Text('حدث خطأ: ${snapshot.error}'));
-            }
-
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('لا توجد طلبات حالياً'));
-            }
-
-            final bookings = snapshot.data!.docs;
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: bookings.length,
-              itemBuilder: (context, index) {
-                final booking = bookings[index];
-                final data = booking.data() as Map<String, dynamic>;
-                final status = data['status']?.toString() ?? 'بانتظار الموافقة';
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 15),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.calendar_month),
-                          title: Text(data['customerName'] ?? ''),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('الخدمة: ${data['serviceName'] ?? ''}'),
-                              Text('التاريخ: ${data['date'] ?? ''}'),
-                              Text('الوقت: ${data['time'] ?? ''}'),
-                              if (data['hasDiscount'] == true) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  'كود الخصم: ${data['couponCode'] ?? ''}',
-                                  style: const TextStyle(color: Colors.green),
-                                ),
-                                Text(
-                                  'نسبة الخصم: ${data['discountPercentage'] ?? 0}%',
-                                  style: const TextStyle(color: Colors.green),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Chip(
-                          label: Text(status),
-                          backgroundColor: statusColor(status),
-                          labelStyle: const TextStyle(color: Colors.white),
-                        ),
-                        const SizedBox(height: 15),
-                        if (status == 'بانتظار الموافقة') ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    updateStatus(booking.id, 'مقبول', data);
-                                  },
-                                  child: const Text('قبول'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    updateStatus(booking.id, 'مرفوض', data);
-                                  },
-                                  child: const Text('رفض'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
+        body: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: managementButtons()),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
+                child: Text(
+                  'طلبات الحجز',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: bookingsList(),
+            ),
+          ],
         ),
       ),
     );

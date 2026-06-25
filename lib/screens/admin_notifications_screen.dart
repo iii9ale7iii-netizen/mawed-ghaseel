@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/ads_service.dart';
+
 class AdminNotificationsScreen extends StatefulWidget {
   const AdminNotificationsScreen({super.key});
 
@@ -17,16 +19,59 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   String target = 'customers';
   String selectedWashId = '';
   String selectedWashName = '';
+
+  DateTime? startAt;
+  DateTime? endAt;
+
   bool isLoading = false;
+
+  Future<void> pickStartDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: startAt ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+
+    if (date == null) return;
+
+    setState(() {
+      startAt = DateTime(date.year, date.month, date.day);
+      if (endAt != null && endAt!.isBefore(startAt!)) {
+        endAt = null;
+      }
+    });
+  }
+
+  Future<void> pickEndDate() async {
+    final initial = endAt ?? startAt ?? DateTime.now();
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: startAt ?? DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+
+    if (date == null) return;
+
+    setState(() {
+      endAt = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    });
+  }
 
   Future<void> addPaidAd() async {
     if (titleController.text.trim().isEmpty ||
         bodyController.text.trim().isEmpty ||
         selectedWashId.isEmpty ||
-        paidAmountController.text.trim().isEmpty) {
+        paidAmountController.text.trim().isEmpty ||
+        startAt == null ||
+        endAt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('يرجى تعبئة العنوان والنص واختيار المغسلة والمبلغ'),
+          content: Text(
+            'يرجى تعبئة العنوان والنص واختيار المغسلة والمبلغ وتاريخ البداية والنهاية',
+          ),
         ),
       );
       return;
@@ -41,51 +86,58 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       return;
     }
 
+    if (endAt!.isBefore(startAt!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تاريخ النهاية يجب أن يكون بعد البداية')),
+      );
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
 
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'title': titleController.text.trim(),
-      'body': bodyController.text.trim(),
-      'target': target,
-      'type': 'paid_ad',
-      'washId': selectedWashId,
-      'washName': selectedWashName,
-      'paidAmount': paidAmount,
-      'isActive': true,
-      'createdAt': Timestamp.now(),
-    });
+    try {
+      await AdsService.addPaidAd(
+        title: titleController.text,
+        body: bodyController.text,
+        target: target,
+        washId: selectedWashId,
+        washName: selectedWashName,
+        paidAmount: paidAmount,
+        startAt: startAt!,
+        endAt: endAt!,
+      );
 
-    titleController.clear();
-    bodyController.clear();
-    paidAmountController.clear();
+      titleController.clear();
+      bodyController.clear();
+      paidAmountController.clear();
 
-    setState(() {
-      target = 'customers';
-      selectedWashId = '';
-      selectedWashName = '';
-      isLoading = false;
-    });
+      setState(() {
+        target = 'customers';
+        selectedWashId = '';
+        selectedWashName = '';
+        startAt = null;
+        endAt = null;
+        isLoading = false;
+      });
 
-    if (mounted) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم إضافة الإعلان المدفوع بنجاح')),
       );
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
-  }
-
-  Future<void> toggleNotification(String id, bool currentValue) async {
-    await FirebaseFirestore.instance.collection('notifications').doc(id).update(
-      {'isActive': !currentValue},
-    );
-  }
-
-  Future<void> deleteNotification(String id) async {
-    await FirebaseFirestore.instance
-        .collection('notifications')
-        .doc(id)
-        .delete();
   }
 
   String targetText(String value) {
@@ -99,12 +151,50 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     return 'إعلان عام';
   }
 
+  String formatLocalDate(DateTime? date) {
+    if (date == null) return 'اختر التاريخ';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Color statusColor(String status) {
+    if (status == 'فعال') return Colors.green;
+    if (status == 'لم يبدأ') return Colors.orange;
+    if (status == 'منتهي') return Colors.red;
+    return Colors.grey;
+  }
+
   @override
   void dispose() {
     titleController.dispose();
     bodyController.dispose();
     paidAmountController.dispose();
     super.dispose();
+  }
+
+  Widget dateButton({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.date_range),
+      label: Text('$label: ${formatLocalDate(date)}'),
+    );
+  }
+
+  Widget adStatusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: statusColor(status),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
+    );
   }
 
   @override
@@ -215,6 +305,34 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
 
             const SizedBox(height: 12),
 
+            Row(
+              children: [
+                Expanded(
+                  child: dateButton(
+                    label: 'تاريخ البداية',
+                    date: startAt,
+                    onPressed: pickStartDate,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            Row(
+              children: [
+                Expanded(
+                  child: dateButton(
+                    label: 'تاريخ النهاية',
+                    date: endAt,
+                    onPressed: pickEndDate,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
             DropdownButtonFormField<String>(
               value: target,
               decoration: const InputDecoration(
@@ -253,12 +371,16 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
 
             const SizedBox(height: 10),
 
-            StreamBuilder<QuerySnapshot>(
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('notifications')
-                  .orderBy('createdAt', descending: true)
+                  .where('type', isEqualTo: 'paid_ad')
                   .snapshots(),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('حدث خطأ: ${snapshot.error}'));
+                }
+
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -271,11 +393,12 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
 
                 return Column(
                   children: notifications.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
+                    final data = doc.data();
 
                     final isActive = data['isActive'] == true;
                     final type = data['type']?.toString() ?? 'general';
-                    final paidAmount = data['paidAmount'] ?? 0;
+                    final paidAmount = AdsService.paidAmount(data);
+                    final status = AdsService.adStatusText(data);
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -284,21 +407,30 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                         child: Column(
                           children: [
                             ListTile(
-                              title: Text(
-                                data['title'] ?? '',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      data['title']?.toString() ?? '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  adStatusBadge(status),
+                                ],
                               ),
                               subtitle: Text(
-                                '${data['body'] ?? ''}\n'
+                                '${data['body']?.toString() ?? ''}\n'
                                 'النوع: ${typeText(type)}\n'
-                                'المغسلة: ${data['washName'] ?? '-'}\n'
-                                'الفئة: ${targetText(data['target'] ?? 'all')}\n'
+                                'المغسلة: ${data['washName']?.toString() ?? '-'}\n'
+                                'الفئة: ${targetText(data['target']?.toString() ?? 'all')}\n'
                                 'المبلغ: $paidAmount ريال\n'
-                                'الحالة: ${isActive ? 'فعال' : 'غير فعال'}',
+                                'تاريخ البداية: ${AdsService.formatDate(data['startAt'])}\n'
+                                'تاريخ النهاية: ${AdsService.formatDate(data['endAt'])}\n'
+                                'الحالة: $status',
                               ),
-                              isThreeLine: true,
+                              isThreeLine: false,
                             ),
                             Row(
                               children: [
@@ -307,7 +439,10 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                                     title: Text(isActive ? 'فعال' : 'غير فعال'),
                                     value: isActive,
                                     onChanged: (_) {
-                                      toggleNotification(doc.id, isActive);
+                                      AdsService.toggleAdStatus(
+                                        adId: doc.id,
+                                        currentValue: isActive,
+                                      );
                                     },
                                   ),
                                 ),
@@ -316,7 +451,9 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                                     Icons.delete,
                                     color: Colors.red,
                                   ),
-                                  onPressed: () => deleteNotification(doc.id),
+                                  onPressed: () {
+                                    AdsService.deleteAd(doc.id);
+                                  },
                                 ),
                               ],
                             ),

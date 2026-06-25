@@ -1,37 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../services/ads_service.dart';
+import '../services/working_hours_service.dart';
 import 'service_selection_screen.dart';
 
 class WashListScreen extends StatelessWidget {
   const WashListScreen({super.key});
 
-  bool isPaidAdActive(Map<String, dynamic> data) {
-    final type = data['type']?.toString() ?? '';
-    final target = data['target']?.toString() ?? '';
-    final isActive = data['isActive'] == true;
+  String formatAdDate(dynamic value) {
+    if (value is Timestamp) {
+      final date = value.toDate();
+      return '${date.day}/${date.month}/${date.year}';
+    }
 
-    return type == 'paid_ad' &&
-        isActive &&
-        (target == 'customers' || target == 'all');
+    return '-';
   }
 
-  Widget paidAdCard(Map<String, dynamic> adData) {
-    return Card(
-      color: Colors.amber.shade50,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const Icon(Icons.campaign, color: Colors.orange),
-        title: Text(
-          adData['title']?.toString() ?? '',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${adData['body']?.toString() ?? ''}\n'
-          'إعلان ممول - ${adData['washName']?.toString() ?? ''}',
-        ),
-        isThreeLine: true,
+  Widget paidAdCard(BuildContext context, Map<String, dynamic> adData) {
+    final title = adData['title']?.toString() ?? '';
+    final body = adData['body']?.toString() ?? '';
+    final washId = adData['washId']?.toString() ?? '';
+    final washName = adData['washName']?.toString() ?? 'مغسلة';
+    final startDate = formatAdDate(adData['startAt']);
+    final endDate = formatAdDate(adData['endAt']);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'إعلان ممول',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(body),
+          const SizedBox(height: 8),
+          Text('المغسلة: $washName'),
+          Text('مدة العرض: $startDate إلى $endDate'),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: washId.isEmpty
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ServiceSelectionScreen(
+                            washId: washId,
+                            washName: washName,
+                          ),
+                        ),
+                      );
+                    },
+              child: const Text('احجز الآن'),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Color washStatusColor(String statusText) {
+    if (statusText.contains('مفتوحة')) return Colors.green;
+    if (statusText.contains('تفتح')) return Colors.orange;
+    return Colors.red;
   }
 
   Widget washCard(
@@ -42,6 +90,11 @@ class WashListScreen extends StatelessWidget {
   ) {
     final washName =
         data['washName']?.toString() ?? data['name']?.toString() ?? '';
+    final statusText = WorkingHoursService.washStatusText(data);
+    final canBook = WorkingHoursService.isOpenAt(
+      washData: data,
+      dateTime: DateTime.now(),
+    );
 
     return Card(
       color: isSponsored ? Colors.amber.shade50 : null,
@@ -75,19 +128,36 @@ class WashListScreen extends StatelessWidget {
               ),
           ],
         ),
-        subtitle: Text(
-          '${data['city']?.toString() ?? ''} - ${data['washType']?.toString() ?? ''}',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${data['city']?.toString() ?? ''} - ${data['washType']?.toString() ?? ''}',
+            ),
+            const SizedBox(height: 4),
+            Text(
+              statusText,
+              style: TextStyle(
+                color: washStatusColor(statusText),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         trailing: ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ServiceSelectionScreen(washId: wash.id, washName: washName),
-              ),
-            );
-          },
+          onPressed: canBook
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ServiceSelectionScreen(
+                        washId: wash.id,
+                        washName: washName,
+                      ),
+                    ),
+                  );
+                }
+              : null,
           child: const Text('اختيار'),
         ),
       ),
@@ -122,23 +192,20 @@ class WashListScreen extends StatelessWidget {
 
             final washes = washesSnapshot.data!.docs;
 
-            return StreamBuilder<QuerySnapshot>(
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('notifications')
+                  .where('type', isEqualTo: 'paid_ad')
                   .snapshots(),
               builder: (context, adsSnapshot) {
                 final adsDocs = adsSnapshot.data?.docs ?? [];
 
                 final paidAds = adsDocs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return isPaidAdActive(data);
+                  return AdsService.isCurrentlyActivePaidAd(doc.data());
                 }).toList();
 
                 final sponsoredWashIds = paidAds
-                    .map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      return data['washId']?.toString() ?? '';
-                    })
+                    .map((doc) => doc.data()['washId']?.toString() ?? '')
                     .where((id) => id.isNotEmpty)
                     .toSet();
 
@@ -156,21 +223,6 @@ class WashListScreen extends StatelessWidget {
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (paidAds.isNotEmpty) ...[
-                      const Text(
-                        'إعلانات ممولة',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...paidAds.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        return paidAdCard(data);
-                      }),
-                      const SizedBox(height: 10),
-                    ],
                     const Text(
                       'المغاسل المتاحة',
                       style: TextStyle(

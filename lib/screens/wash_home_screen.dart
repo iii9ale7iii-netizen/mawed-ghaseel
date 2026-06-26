@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../main.dart';
 import '../services/session_service.dart';
+import '../theme/app_glass_ui.dart';
 import 'service_management_screen.dart';
 import 'wash_notifications_screen.dart';
 import 'working_hours_screen.dart';
@@ -16,6 +17,8 @@ class WashHomeScreen extends StatefulWidget {
 }
 
 class _WashHomeScreenState extends State<WashHomeScreen> {
+  String selectedStatusFilter = 'all';
+
   Future<void> createCustomerNotification({
     required String customerId,
     required String title,
@@ -51,7 +54,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     final date = bookingData['date']?.toString() ?? '';
     final time = bookingData['time']?.toString() ?? '';
 
-    if (status == 'مقبول') {
+    if (status == 'مقبول' || status == 'ظ…ظ‚ط¨ظˆظ„') {
       await createCustomerNotification(
         customerId: customerId,
         bookingId: bookingId,
@@ -59,7 +62,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
         body:
             'تم قبول حجز خدمة $serviceName لدى $washName بتاريخ $date الساعة $time',
       );
-    } else if (status == 'مرفوض') {
+    } else if (status == 'مرفوض' || status == 'ظ…ط±ظپظˆط¶') {
       await createCustomerNotification(
         customerId: customerId,
         bookingId: bookingId,
@@ -71,9 +74,9 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('تم تحديث حالة الحجز إلى $status')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('تم تحديث حالة الحجز إلى $status')),
+    );
   }
 
   Stream<int> unreadNotificationsCountStream() async* {
@@ -84,11 +87,10 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
       return;
     }
 
-    await for (final notificationSnapshot
-        in FirebaseFirestore.instance
-            .collection('notifications')
-            .where('isActive', isEqualTo: true)
-            .snapshots()) {
+    await for (final notificationSnapshot in FirebaseFirestore.instance
+        .collection('notifications')
+        .where('isActive', isEqualTo: true)
+        .snapshots()) {
       final notifications = notificationSnapshot.docs.where((doc) {
         final data = doc.data();
         final target = data['target']?.toString() ?? 'all';
@@ -125,11 +127,12 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
         final count = snapshot.data ?? 0;
 
         return Stack(
-          alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
-            IconButton(
-              icon: const Icon(Icons.notifications),
-              onPressed: () {
+            AppCircleIconButton(
+              icon: Icons.notifications_rounded,
+              tooltip: 'الإشعارات',
+              onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -140,22 +143,25 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
             ),
             if (count > 0)
               Positioned(
-                top: 8,
-                right: 8,
+                top: -2,
+                right: -2,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  constraints: const BoxConstraints(minWidth: 19),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE11D48),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: Text(
                     count > 99 ? '99+' : count.toString(),
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
                     textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),
@@ -181,47 +187,130 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
   }
 
   Color statusColor(String status) {
-    if (status == 'مقبول') return Colors.green;
-    if (status == 'مرفوض') return Colors.red;
+    if (status == 'ظ…ظ‚ط¨ظˆظ„' || status == 'مقبول') return Colors.green;
+    if (status == 'ظ…ط±ظپظˆط¶' || status == 'مرفوض') return Colors.red;
     return Colors.orange;
   }
 
+
+  bool isPendingStatus(String status) {
+    return status == 'بانتظار الموافقة' ||
+        status == 'ط¨ط§ظ†طھط¸ط§ط± ط§ظ„ظ…ظˆط§ظپظ‚ط©' ||
+        status == 'ط·آ¨ط·آ§ط¸â€ ط·ع¾ط·آ¸ط·آ§ط·آ± ط·آ§ط¸â€‍ط¸â€¦ط¸ث†ط·آ§ط¸ظ¾ط¸â€ڑط·آ©';
+  }
+
+  bool isAcceptedStatus(String status) {
+    return status == 'مقبول' ||
+        status == 'ظ…ظ‚ط¨ظˆظ„' ||
+        status == 'ط¸â€¦ط¸â€ڑط·آ¨ط¸ث†ط¸â€‍';
+  }
+
+  bool isRejectedStatus(String status) {
+    return status == 'مرفوض' ||
+        status == 'ظ…ط±ظپظˆط¶' ||
+        status == 'ط¸â€¦ط·آ±ط¸ظ¾ط¸ث†ط·آ¶';
+  }
+
+  bool matchesStatusFilter(String status) {
+    if (selectedStatusFilter == 'pending') return isPendingStatus(status);
+    if (selectedStatusFilter == 'accepted') return isAcceptedStatus(status);
+    if (selectedStatusFilter == 'rejected') return isRejectedStatus(status);
+    return true;
+  }
+
   Widget managementButtons() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AppSectionTitle(
+          title: 'إدارة المغسلة',
+          subtitle: 'تحكم بالخدمات وساعات استقبال الحجوزات',
+          icon: Icons.dashboard_customize_rounded,
+        ),
+        const SizedBox(height: 12),
+        AppActionCard(
+          title: 'إدارة الخدمات',
+          subtitle: 'إضافة الخدمات وتعديل قائمة الأسعار والمدة.',
+          icon: Icons.design_services_rounded,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ServiceManagementScreen(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        AppActionCard(
+          title: 'أوقات العمل',
+          subtitle: 'تحديد أيام العمل وساعات استقبال الحجوزات.',
+          icon: Icons.access_time_rounded,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WorkingHoursScreen(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+
+  String statusLabel(String status) {
+    if (isAcceptedStatus(status)) return 'مقبول';
+    if (isRejectedStatus(status)) return 'مرفوض';
+    return 'بانتظار الموافقة';
+  }
+
+  Widget _filterChip(String label, String value, IconData icon) {
+    final selected = selectedStatusFilter == value;
+
+    return ChoiceChip(
+      selected: selected,
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.design_services),
-              label: const Text('إدارة الخدمات'),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ServiceManagementScreen(),
-                  ),
-                );
-              },
-            ),
+          Icon(
+            icon,
+            size: 16,
+            color: selected ? Colors.white : AppGlassUi.primary,
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.access_time),
-              label: const Text('أوقات العمل واستقبال الحجوزات'),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const WorkingHoursScreen(),
-                  ),
-                );
-              },
-            ),
-          ),
+          const SizedBox(width: 5),
+          Text(label),
+        ],
+      ),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : AppGlassUi.darkText,
+        fontWeight: FontWeight.w800,
+      ),
+      selectedColor: AppGlassUi.primary,
+      backgroundColor: Colors.white.withValues(alpha: 0.78),
+      side: const BorderSide(color: Color(0xFFD9ECFF)),
+      onSelected: (_) {
+        setState(() {
+          selectedStatusFilter = value;
+        });
+      },
+    );
+  }
+
+  Widget bookingFilters() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          _filterChip('الكل', 'all', Icons.list_alt_rounded),
+          const SizedBox(width: 8),
+          _filterChip('بانتظار', 'pending', Icons.hourglass_top_rounded),
+          const SizedBox(width: 8),
+          _filterChip('مقبولة', 'accepted', Icons.check_circle_rounded),
+          const SizedBox(width: 8),
+          _filterChip('مرفوضة', 'rejected', Icons.cancel_rounded),
         ],
       ),
     );
@@ -231,63 +320,96 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     final data = booking.data() as Map<String, dynamic>;
     final status = data['status']?.toString() ?? 'بانتظار الموافقة';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        padding: const EdgeInsets.all(15),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: const Icon(Icons.calendar_month),
-              title: Text(data['customerName'] ?? ''),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('الخدمة: ${data['serviceName'] ?? ''}'),
-                  Text('التاريخ: ${data['date'] ?? ''}'),
-                  Text('الوقت: ${data['time'] ?? ''}'),
-                  if (data['hasDiscount'] == true) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'كود الخصم: ${data['couponCode'] ?? ''}',
-                      style: const TextStyle(color: Colors.green),
+            Row(
+              children: [
+                const AppActionIcon(icon: Icons.calendar_month_rounded),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    data['customerName']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppGlassUi.darkText,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
-                    Text(
-                      'نسبة الخصم: ${data['discountPercentage'] ?? 0}%',
-                      style: const TextStyle(color: Colors.green),
-                    ),
-                  ],
-                ],
-              ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: AppStatusChip(
+                    label: statusLabel(status),
+                    color: statusColor(status),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
-            Chip(
-              label: Text(status),
-              backgroundColor: statusColor(status),
-              labelStyle: const TextStyle(color: Colors.white),
+            AppInfoRow(
+              icon: Icons.design_services_rounded,
+              text: "الخدمة: ${data['serviceName'] ?? ''}",
             ),
-            const SizedBox(height: 15),
-            if (status == 'بانتظار الموافقة') ...[
+            AppInfoRow(
+              icon: Icons.date_range_rounded,
+              text: "التاريخ: ${data['date'] ?? ''}",
+            ),
+            AppInfoRow(
+              icon: Icons.access_time_rounded,
+              text: "الوقت: ${data['time'] ?? ''}",
+            ),
+            if (data['hasDiscount'] == true) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.28)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'تم تطبيق خصم',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text("كود الخصم: ${data['couponCode'] ?? ''}"),
+                    Text("نسبة الخصم: ${data['discountPercentage'] ?? 0}%"),
+                  ],
+                ),
+              ),
+            ],
+            if (isPendingStatus(status)) ...[
+              const SizedBox(height: 15),
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        updateStatus(booking.id, 'مقبول', data);
-                      },
-                      child: const Text('قبول'),
+                    child: AppGradientButton(
+                      title: 'قبول',
+                      icon: Icons.check_rounded,
+                      onTap: () => updateStatus(booking.id, 'مقبول', data),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                      ),
-                      onPressed: () {
-                        updateStatus(booking.id, 'مرفوض', data);
-                      },
-                      child: const Text('رفض'),
+                    child: AppGradientButton(
+                      title: 'رفض',
+                      icon: Icons.close_rounded,
+                      danger: true,
+                      onTap: () => updateStatus(booking.id, 'مرفوض', data),
                     ),
                   ),
                 ],
@@ -307,31 +429,85 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return const AppLoadingState();
         }
 
         if (snapshot.hasError) {
-          return SliverFillRemaining(
-            child: Center(child: Text('حدث خطأ: ${snapshot.error}')),
+          return AppEmptyState(
+            title: 'حدث خطأ: ${snapshot.error}',
+            icon: Icons.error_outline_rounded,
           );
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SliverFillRemaining(
-            child: Center(child: Text('لا توجد طلبات حالياً')),
+          return const AppEmptyState(
+            title: 'لا توجد طلبات حالياً',
+            icon: Icons.event_busy_rounded,
           );
         }
 
-        final bookings = snapshot.data!.docs;
+        final bookings = snapshot.data!.docs.where((booking) {
+          final data = booking.data() as Map<String, dynamic>;
+          final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+          return matchesStatusFilter(status);
+        }).toList();
 
-        return SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            return bookingCard(bookings[index]);
-          }, childCount: bookings.length),
-        );
+        if (bookings.isEmpty) {
+          return const AppEmptyState(
+            title: 'لا توجد حجوزات ضمن هذا التصنيف',
+            icon: Icons.filter_alt_off_rounded,
+          );
+        }
+
+        return Column(children: bookings.map(bookingCard).toList());
       },
+    );
+  }
+
+  Widget _header() {
+    final washName = SessionService.currentWashName ?? 'لوحة المغسلة';
+
+    return AppGlassCard(
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/images/logo_mawed_ghaseel.png',
+            width: 58,
+            height: 58,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  washName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppGlassUi.darkText,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'تابع الطلبات وأدر خدمات المغسلة من مكان واحد.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppGlassUi.mutedText,
+                    fontSize: 12.8,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -339,31 +515,35 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(SessionService.currentWashName ?? 'لوحة المغسلة'),
-          centerTitle: true,
-          actions: [
-            notificationButton(context),
-            IconButton(icon: const Icon(Icons.logout), onPressed: logout),
-          ],
-        ),
-        body: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: managementButtons()),
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
-                child: Text(
-                  'طلبات الحجز',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      child: AppGlassScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassTopBar(
+              title: 'لوحة المغسلة',
+              actions: [
+                AppCircleIconButton(
+                  icon: Icons.logout_rounded,
+                  tooltip: 'تسجيل الخروج',
+                  onTap: logout,
                 ),
-              ),
+                notificationButton(context),
+              ],
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: bookingsList(),
+            const SizedBox(height: 18),
+            _header(),
+            const SizedBox(height: 18),
+            managementButtons(),
+            const SizedBox(height: 18),
+            const AppSectionTitle(
+              title: 'طلبات الحجز',
+              subtitle: 'راجع الحجوزات الجديدة وقم بقبولها أو رفضها',
+              icon: Icons.assignment_rounded,
             ),
+            const SizedBox(height: 12),
+            bookingFilters(),
+            const SizedBox(height: 12),
+            bookingsList(),
           ],
         ),
       ),

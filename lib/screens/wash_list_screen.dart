@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/ads_service.dart';
 import '../services/working_hours_service.dart';
+import '../theme/app_glass_ui.dart';
 import 'service_selection_screen.dart';
 
 class WashListScreen extends StatelessWidget {
@@ -18,58 +19,84 @@ class WashListScreen extends StatelessWidget {
   }
 
   Widget paidAdCard(BuildContext context, Map<String, dynamic> adData) {
-    final title = adData['title']?.toString() ?? '';
-    final body = adData['body']?.toString() ?? '';
+    final title = adData['title']?.toString().trim() ?? '';
+    final body = adData['body']?.toString().trim() ?? '';
     final washId = adData['washId']?.toString() ?? '';
-    final washName = adData['washName']?.toString() ?? 'مغسلة';
+    final washName = adData['washName']?.toString().trim() ?? 'مغسلة';
     final startDate = formatAdDate(adData['startAt']);
     final endDate = formatAdDate(adData['endAt']);
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
+    return AppGlassCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.amber.shade300),
-      ),
+      color: const Color(0xFFFFFBEB).withValues(alpha: 0.88),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'إعلان ممول',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              const AppActionIcon(icon: Icons.campaign_rounded),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AppStatusChip(
+                      label: 'إعلان ممول',
+                      color: Color(0xFFB45309),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      title.isEmpty ? 'عرض خاص' : title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppGlassUi.darkText,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(body),
-          const SizedBox(height: 8),
-          Text('المغسلة: $washName'),
-          Text('مدة العرض: $startDate إلى $endDate'),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: washId.isEmpty
-                  ? null
-                  : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ServiceSelectionScreen(
-                            washId: washId,
-                            washName: washName,
-                          ),
-                        ),
-                      );
-                    },
-              child: const Text('احجز الآن'),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              body,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppGlassUi.mutedText,
+                fontSize: 12.8,
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+              ),
             ),
+          ],
+          const SizedBox(height: 8),
+          AppInfoRow(icon: Icons.local_car_wash_rounded, text: 'المغسلة: $washName'),
+          AppInfoRow(
+            icon: Icons.date_range_rounded,
+            text: 'مدة العرض: $startDate إلى $endDate',
+          ),
+          const SizedBox(height: 14),
+          AppGradientButton(
+            title: 'احجز الآن',
+            icon: Icons.arrow_back_rounded,
+            onTap: washId.isEmpty
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ServiceSelectionScreen(
+                          washId: washId,
+                          washName: washName,
+                        ),
+                      ),
+                    );
+                  },
           ),
         ],
       ),
@@ -77,8 +104,12 @@ class WashListScreen extends StatelessWidget {
   }
 
   Color washStatusColor(String statusText) {
-    if (statusText.contains('مفتوحة')) return Colors.green;
-    if (statusText.contains('تفتح')) return Colors.orange;
+    if (statusText.contains('مفتوحة') || statusText.contains('ظ…ظپطھظˆط­ط©')) {
+      return Colors.green;
+    }
+    if (statusText.contains('تفتح') || statusText.contains('طھظپطھط­')) {
+      return Colors.orange;
+    }
     return Colors.red;
   }
 
@@ -91,84 +122,173 @@ class WashListScreen extends StatelessWidget {
     final washName =
         data['washName']?.toString() ?? data['name']?.toString() ?? 'مغسلة';
     final statusText = WorkingHoursService.washStatusText(data);
+    final statusColor = washStatusColor(statusText);
     final canBook = WorkingHoursService.isOpenAt(
       washData: data,
       dateTime: DateTime.now(),
     );
 
-    return Card(
-      color: isSponsored ? Colors.amber.shade50 : null,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: Icon(
-          Icons.local_car_wash,
-          color: isSponsored ? Colors.orange : null,
-        ),
-        title: Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        padding: const EdgeInsets.all(15),
+        color: isSponsored
+            ? const Color(0xFFFFFBEB).withValues(alpha: 0.88)
+            : null,
+        child: Column(
           children: [
-            Expanded(
-              child: Text(
-                washName,
-                style: TextStyle(
-                  fontWeight: isSponsored ? FontWeight.bold : FontWeight.normal,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppActionIcon(
+                  icon: isSponsored
+                      ? Icons.workspace_premium_rounded
+                      : Icons.local_car_wash_rounded,
                 ),
-              ),
-            ),
-            if (isSponsored)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'ممول',
-                  style: TextStyle(color: Colors.white, fontSize: 11),
-                ),
-              ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${data['city']?.toString() ?? ''} - ${data['washType']?.toString() ?? ''}',
-            ),
-            const SizedBox(height: 4),
-            Text(
-              statusText,
-              style: TextStyle(
-                color: washStatusColor(statusText),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        trailing: SizedBox(
-          width: 90,
-          height: 40,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(90, 40),
-              padding: EdgeInsets.zero,
-            ),
-            onPressed: canBook
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ServiceSelectionScreen(
-                          washId: wash.id,
-                          washName: washName,
-                        ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              washName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppGlassUi.darkText,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          if (isSponsored) ...[
+                            const SizedBox(width: 8),
+                            const AppStatusChip(
+                              label: 'ممول',
+                              color: Color(0xFFB45309),
+                            ),
+                          ],
+                        ],
                       ),
-                    );
-                  }
-                : null,
-            child: const Text('اختيار'),
-          ),
+                      AppInfoRow(
+                        icon: Icons.location_city_rounded,
+                        text:
+                            "${data['city']?.toString() ?? ''} - ${data['washType']?.toString() ?? ''}",
+                      ),
+                      AppInfoRow(
+                        icon: Icons.schedule_rounded,
+                        text: statusText,
+                        color: statusColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            AppGradientButton(
+              title: 'اختيار',
+              icon: Icons.arrow_back_rounded,
+              onTap: canBook
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ServiceSelectionScreen(
+                            washId: wash.id,
+                            washName: washName,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _content(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('washes')
+          .where('status', isEqualTo: 'approved')
+          .snapshots(),
+      builder: (context, washesSnapshot) {
+        if (washesSnapshot.connectionState == ConnectionState.waiting) {
+          return const AppLoadingState();
+        }
+
+        if (washesSnapshot.hasError) {
+          return AppEmptyState(
+            title: 'خطأ في تحميل المغاسل: ${washesSnapshot.error}',
+            icon: Icons.error_outline_rounded,
+          );
+        }
+
+        if (!washesSnapshot.hasData || washesSnapshot.data!.docs.isEmpty) {
+          return const AppEmptyState(
+            title: 'لا توجد مغاسل متاحة حالياً',
+            icon: Icons.local_car_wash_outlined,
+          );
+        }
+
+        final washes = washesSnapshot.data!.docs;
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('type', isEqualTo: 'paid_ad')
+              .snapshots(),
+          builder: (context, adsSnapshot) {
+            final adsDocs = adsSnapshot.data?.docs ?? [];
+            final paidAds = adsDocs.where((doc) {
+              return AdsService.isCurrentlyActivePaidAd(doc.data());
+            }).toList();
+
+            final sponsoredWashIds = paidAds
+                .map((doc) => doc.data()['washId']?.toString() ?? '')
+                .where((id) => id.isNotEmpty)
+                .toSet();
+
+            final sortedWashes = [...washes];
+            sortedWashes.sort((a, b) {
+              final aSponsored = sponsoredWashIds.contains(a.id);
+              final bSponsored = sponsoredWashIds.contains(b.id);
+
+              if (aSponsored && !bSponsored) return -1;
+              if (!aSponsored && bSponsored) return 1;
+              return 0;
+            });
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppSectionTitle(
+                  title: 'المغاسل المتاحة',
+                  subtitle: 'اختر المغسلة المناسبة واحجز خدمتك',
+                  icon: Icons.local_car_wash_rounded,
+                ),
+                const SizedBox(height: 14),
+                ...paidAds.take(2).map((ad) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: paidAdCard(context, ad.data()),
+                    )),
+                ...sortedWashes.map((wash) {
+                  final data = wash.data() as Map<String, dynamic>;
+                  final isSponsored = sponsoredWashIds.contains(wash.id);
+
+                  return washCard(context, wash, data, isSponsored);
+                }),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -176,80 +296,18 @@ class WashListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('اختر المغسلة'), centerTitle: true),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('washes')
-              .where('status', isEqualTo: 'approved')
-              .snapshots(),
-          builder: (context, washesSnapshot) {
-            if (washesSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (washesSnapshot.hasError) {
-              return Center(
-                child: Text('خطأ في تحميل المغاسل: ${washesSnapshot.error}'),
-              );
-            }
-
-            if (!washesSnapshot.hasData || washesSnapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('لا توجد مغاسل متاحة حالياً'));
-            }
-
-            final washes = washesSnapshot.data!.docs;
-
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('notifications')
-                  .where('type', isEqualTo: 'paid_ad')
-                  .snapshots(),
-              builder: (context, adsSnapshot) {
-                final adsDocs = adsSnapshot.data?.docs ?? [];
-
-                final paidAds = adsDocs.where((doc) {
-                  return AdsService.isCurrentlyActivePaidAd(doc.data());
-                }).toList();
-
-                final sponsoredWashIds = paidAds
-                    .map((doc) => doc.data()['washId']?.toString() ?? '')
-                    .where((id) => id.isNotEmpty)
-                    .toSet();
-
-                final sortedWashes = [...washes];
-
-                sortedWashes.sort((a, b) {
-                  final aSponsored = sponsoredWashIds.contains(a.id);
-                  final bSponsored = sponsoredWashIds.contains(b.id);
-
-                  if (aSponsored && !bSponsored) return -1;
-                  if (!aSponsored && bSponsored) return 1;
-                  return 0;
-                });
-
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text(
-                      'المغاسل المتاحة',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ...sortedWashes.map((wash) {
-                      final data = wash.data() as Map<String, dynamic>;
-                      final isSponsored = sponsoredWashIds.contains(wash.id);
-
-                      return washCard(context, wash, data, isSponsored);
-                    }),
-                  ],
-                );
-              },
-            );
-          },
+      child: AppGlassScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassTopBar(
+              title: 'اختر المغسلة',
+              leadingIcon: Icons.arrow_back_rounded,
+              leadingTooltip: 'رجوع',
+            ),
+            const SizedBox(height: 18),
+            _content(context),
+          ],
         ),
       ),
     );

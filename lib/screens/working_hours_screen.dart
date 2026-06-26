@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/session_service.dart';
 import '../services/working_hours_service.dart';
+import '../theme/app_glass_ui.dart';
 
 class WorkingHoursScreen extends StatefulWidget {
   const WorkingHoursScreen({super.key});
@@ -76,9 +77,9 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('تم حفظ أوقات العمل بنجاح')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حفظ أوقات العمل بنجاح')),
+    );
   }
 
   Future<void> pickTime({required String dayKey, required String field}) async {
@@ -112,23 +113,68 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
   }
 
   Widget bookingEnabledCard() {
-    return Card(
-      child: SwitchListTile(
-        title: const Text(
-          'استقبال الحجوزات',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          bookingEnabled
-              ? 'المغسلة تستقبل حجوزات حالياً'
-              : 'المغسلة لا تستقبل حجوزات حالياً',
-        ),
-        value: bookingEnabled,
-        onChanged: (value) {
-          setState(() {
-            bookingEnabled = value;
-          });
-        },
+    return AppGlassCard(
+      child: Row(
+        children: [
+          const AppActionIcon(icon: Icons.event_available_rounded),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'استقبال الحجوزات',
+                  style: TextStyle(
+                    color: AppGlassUi.darkText,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  bookingEnabled
+                      ? 'المغسلة تستقبل حجوزات حالياً'
+                      : 'المغسلة لا تستقبل حجوزات حالياً',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppGlassUi.mutedText,
+                    fontSize: 12.8,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: bookingEnabled,
+            activeColor: AppGlassUi.primary,
+            onChanged: (value) {
+              setState(() {
+                bookingEnabled = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeButton({
+    required String title,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.access_time_rounded, size: 18),
+      label: FittedBox(child: Text(title)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppGlassUi.primary,
+        backgroundColor: Colors.white.withValues(alpha: 0.66),
+        side: const BorderSide(color: Color(0xFFD9ECFF)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       ),
     );
   }
@@ -139,47 +185,72 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
     final from = dayData['from']?.toString() ?? '08:00';
     final to = dayData['to']?.toString() ?? '23:00';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        padding: const EdgeInsets.all(15),
         child: Column(
           children: [
-            SwitchListTile(
-              title: Text(
-                WorkingHoursService.arabicDayName(dayKey),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(enabled ? 'يوم عمل' : 'مغلق'),
-              value: enabled,
-              onChanged: (value) {
-                setState(() {
-                  dayData['enabled'] = value;
-                  workingHours[dayKey] = dayData;
-                });
-              },
+            Row(
+              children: [
+                AppActionIcon(
+                  icon: enabled ? Icons.today_rounded : Icons.event_busy_rounded,
+                  active: enabled,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        WorkingHoursService.arabicDayName(dayKey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppGlassUi.darkText,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        enabled ? 'يوم عمل' : 'مغلق',
+                        style: TextStyle(
+                          color: enabled ? Colors.green : Colors.red,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: enabled,
+                  activeColor: AppGlassUi.primary,
+                  onChanged: (value) {
+                    setState(() {
+                      dayData['enabled'] = value;
+                      workingHours[dayKey] = dayData;
+                    });
+                  },
+                ),
+              ],
             ),
             if (enabled) ...[
-              const Divider(),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        pickTime(dayKey: dayKey, field: 'from');
-                      },
-                      icon: const Icon(Icons.access_time),
-                      label: Text('من: $from'),
+                    child: _timeButton(
+                      title: 'من: $from',
+                      onPressed: () => pickTime(dayKey: dayKey, field: 'from'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        pickTime(dayKey: dayKey, field: 'to');
-                      },
-                      icon: const Icon(Icons.access_time),
-                      label: Text('إلى: $to'),
+                    child: _timeButton(
+                      title: 'إلى: $to',
+                      onPressed: () => pickTime(dayKey: dayKey, field: 'to'),
                     ),
                   ),
                 ],
@@ -192,44 +263,45 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
   }
 
   List<String> get daysOrder => const [
-    'saturday',
-    'sunday',
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-  ];
+        'saturday',
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+      ];
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('أوقات العمل'), centerTitle: true),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
+      child: AppGlassScaffold(
+        child: isLoading
+            ? const AppLoadingState()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  bookingEnabledCard(),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'تحديد أيام وساعات العمل',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  AppGlassTopBar(
+                    title: 'أوقات العمل',
+                    leadingIcon: Icons.arrow_back_rounded,
+                    leadingTooltip: 'رجوع',
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 18),
+                  bookingEnabledCard(),
+                  const SizedBox(height: 18),
+                  const AppSectionTitle(
+                    title: 'الأيام والساعات',
+                    subtitle: 'حدد مواعيد استقبال الحجوزات',
+                    icon: Icons.schedule_rounded,
+                  ),
+                  const SizedBox(height: 12),
                   ...daysOrder.map(dayCard),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: isSaving ? null : saveWorkingHours,
-                      icon: const Icon(Icons.save),
-                      label: isSaving
-                          ? const Text('جاري الحفظ...')
-                          : const Text('حفظ أوقات العمل'),
-                    ),
+                  const SizedBox(height: 4),
+                  AppGradientButton(
+                    title: isSaving ? 'جاري الحفظ...' : 'حفظ أوقات العمل',
+                    icon: Icons.save_rounded,
+                    onTap: isSaving ? null : saveWorkingHours,
                   ),
                 ],
               ),

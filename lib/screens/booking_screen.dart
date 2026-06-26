@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/session_service.dart';
 import '../services/working_hours_service.dart';
+import '../theme/app_glass_ui.dart';
 
 class BookingScreen extends StatefulWidget {
   final String washId;
@@ -41,6 +42,12 @@ class _BookingScreenState extends State<BookingScreen> {
       initialDate: selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
 
     if (pickedDate != null) {
@@ -56,6 +63,12 @@ class _BookingScreenState extends State<BookingScreen> {
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: selectedTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
 
     if (pickedTime != null && mounted) {
@@ -96,14 +109,13 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!washDoc.exists) {
       if (!mounted) return false;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('المغسلة غير موجودة')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('المغسلة غير موجودة')),
+      );
       return false;
     }
 
     final washData = washDoc.data() ?? {};
-
     final bookingEnabled = WorkingHoursService.isWashBookingEnabled(washData);
 
     if (!bookingEnabled) {
@@ -136,15 +148,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
       final dayName = WorkingHoursService.arabicDayName(dayKey);
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('المغسلة مغلقة يوم $dayName')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('المغسلة مغلقة يوم $dayName')),
+      );
       return false;
     }
 
     final from = dayData['from']?.toString() ?? '00:00';
     final to = dayData['to']?.toString() ?? '00:00';
-
     final isOpen = WorkingHoursService.isOpenAt(
       washData: washData,
       dateTime: bookingDateTime,
@@ -170,9 +181,9 @@ class _BookingScreenState extends State<BookingScreen> {
     final code = couponController.text.trim().toUpperCase();
 
     if (code.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('يرجى إدخال كود الخصم')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى إدخال كود الخصم')),
+      );
       return;
     }
 
@@ -220,9 +231,9 @@ class _BookingScreenState extends State<BookingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -265,10 +276,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
       bool booked = false;
 
-      for (var doc in existingBookings.docs) {
+      for (final doc in existingBookings.docs) {
         final data = doc.data();
 
-        if (data['status'] != 'مرفوض') {
+        if (data['status'] != 'مرفوض' && data['status'] != 'ظ…ط±ظپظˆط¶') {
           booked = true;
           break;
         }
@@ -313,9 +324,9 @@ class _BookingScreenState extends State<BookingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -333,118 +344,175 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
+  Widget _bookingField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    VoidCallback? onTap,
+    bool readOnly = false,
+    bool enabled = true,
+    String? hintText,
+    Widget? suffixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: readOnly,
+      enabled: enabled,
+      onTap: onTap,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        prefixIcon: Icon(icon, color: AppGlassUi.primary),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.92),
+      ),
+    );
+  }
+
+  Widget _couponAppliedCard() {
+    return AppGlassCard(
+      padding: const EdgeInsets.all(14),
+      color: Colors.green.withValues(alpha: 0.10),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.green, size: 30),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'تم تطبيق الكود: $appliedCouponCode',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppGlassUi.darkText,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'نسبة الخصم: $discountPercentage%',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                couponController.clear();
+                appliedCouponCode = '';
+                discountPercentage = 0;
+                couponApplied = false;
+              });
+            },
+            child: const Text('إزالة'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: Text(widget.washName), centerTitle: true),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: ListView(
-            children: [
-              Text(
-                'الخدمة المختارة: ${widget.serviceName}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              TextField(
-                controller: dateController,
-                readOnly: true,
-                onTap: selectDate,
-                decoration: const InputDecoration(
-                  labelText: 'اختر التاريخ',
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.calendar_month),
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              TextField(
-                controller: timeController,
-                readOnly: true,
-                onTap: selectTime,
-                decoration: const InputDecoration(
-                  labelText: 'اختر الوقت',
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.access_time),
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              TextField(
-                controller: couponController,
-                enabled: !couponApplied,
-                decoration: InputDecoration(
-                  labelText: 'كود الخصم اختياري',
-                  hintText: 'مثال: WASH20',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: couponApplied
-                      ? const Icon(Icons.check_circle, color: Colors.green)
-                      : const Icon(Icons.discount),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isCheckingCoupon || couponApplied
-                      ? null
-                      : applyCoupon,
-                  child: isCheckingCoupon
-                      ? const CircularProgressIndicator()
-                      : Text(couponApplied ? 'تم تطبيق الخصم' : 'تطبيق الخصم'),
-                ),
-              ),
-
-              if (couponApplied) ...[
-                const SizedBox(height: 10),
-                Card(
-                  color: Colors.green.shade50,
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                    ),
-                    title: Text('تم تطبيق الكود: $appliedCouponCode'),
-                    subtitle: Text('نسبة الخصم: $discountPercentage%'),
-                    trailing: TextButton(
-                      onPressed: () {
-                        setState(() {
-                          couponController.clear();
-                          appliedCouponCode = '';
-                          discountPercentage = 0;
-                          couponApplied = false;
-                        });
-                      },
-                      child: const Text('إزالة'),
-                    ),
+      child: AppGlassScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassTopBar(
+              title: widget.washName,
+              leadingIcon: Icons.arrow_back_rounded,
+              leadingTooltip: 'رجوع',
+            ),
+            const SizedBox(height: 18),
+            AppGlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppSectionTitle(
+                    title: 'تأكيد الحجز',
+                    subtitle: 'اختر التاريخ والوقت المناسبين لك',
+                    icon: Icons.event_available_rounded,
                   ),
-                ),
-              ],
-
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : saveBooking,
-                  child: isLoading
-                      ? const CircularProgressIndicator()
-                      : const Text('تأكيد الحجز'),
-                ),
+                  const SizedBox(height: 14),
+                  AppInfoRow(
+                    icon: Icons.local_car_wash_rounded,
+                    text: 'المغسلة: ${widget.washName}',
+                  ),
+                  AppInfoRow(
+                    icon: Icons.design_services_rounded,
+                    text: 'الخدمة المختارة: ${widget.serviceName}',
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 14),
+            AppGlassCard(
+              child: Column(
+                children: [
+                  _bookingField(
+                    controller: dateController,
+                    label: 'اختر التاريخ',
+                    icon: Icons.calendar_month_rounded,
+                    readOnly: true,
+                    onTap: selectDate,
+                    suffixIcon: const Icon(Icons.expand_more_rounded),
+                  ),
+                  const SizedBox(height: 12),
+                  _bookingField(
+                    controller: timeController,
+                    label: 'اختر الوقت',
+                    icon: Icons.access_time_rounded,
+                    readOnly: true,
+                    onTap: selectTime,
+                    suffixIcon: const Icon(Icons.expand_more_rounded),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            AppGlassCard(
+              child: Column(
+                children: [
+                  _bookingField(
+                    controller: couponController,
+                    label: 'كود الخصم اختياري',
+                    hintText: 'مثال: WASH20',
+                    icon: Icons.local_offer_rounded,
+                    enabled: !couponApplied,
+                    suffixIcon: couponApplied
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : const Icon(Icons.discount_rounded),
+                  ),
+                  const SizedBox(height: 12),
+                  AppGradientButton(
+                    title: couponApplied ? 'تم تطبيق الخصم' : 'تطبيق الخصم',
+                    icon: couponApplied
+                        ? Icons.check_rounded
+                        : Icons.local_offer_rounded,
+                    onTap: isCheckingCoupon || couponApplied ? null : applyCoupon,
+                  ),
+                ],
+              ),
+            ),
+            if (couponApplied) ...[
+              const SizedBox(height: 12),
+              _couponAppliedCard(),
             ],
-          ),
+            const SizedBox(height: 18),
+            AppGradientButton(
+              title: isLoading ? 'جاري تأكيد الحجز...' : 'تأكيد الحجز',
+              icon: Icons.check_circle_rounded,
+              onTap: isLoading ? null : saveBooking,
+            ),
+          ],
         ),
       ),
     );

@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /customers/{customerId} {
+      allow create: if signedIn();
+      allow read, update: if signedIn() && (request.auth.uid == customerId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /washes/{washId} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        request.auth.uid == washId ||
+        resource.data.ownerUid == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if signedIn() && (
+        request.resource.data.washId == request.auth.uid ||
+        resource.data.washId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
+      allow read: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.washId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.washId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /notification_reads/{readId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

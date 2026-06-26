@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/session_service.dart';
+import '../theme/app_glass_ui.dart';
 
 class ServiceManagementScreen extends StatefulWidget {
   const ServiceManagementScreen({super.key});
@@ -44,105 +45,148 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('إدارة الخدمات'), centerTitle: true),
-        body: Column(
+  void dispose() {
+    nameController.dispose();
+    priceController.dispose();
+    durationController.dispose();
+    super.dispose();
+  }
+
+  Widget _serviceCard(QueryDocumentSnapshot service) {
+    final data = service.data() as Map<String, dynamic>;
+    final serviceName = data['serviceName']?.toString() ?? '';
+    final price = data['price']?.toString() ?? '';
+    final duration = data['durationMinutes']?.toString() ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        padding: const EdgeInsets.all(15),
+        child: Row(
           children: [
+            const AppActionIcon(icon: Icons.design_services_rounded),
+            const SizedBox(width: 12),
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('services')
-                    .where('washId', isEqualTo: SessionService.currentWashId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final services = snapshot.data!.docs;
-
-                  if (services.isEmpty) {
-                    return const Center(child: Text('لا توجد خدمات'));
-                  }
-
-                  return ListView.builder(
-                    itemCount: services.length,
-                    itemBuilder: (context, index) {
-                      final service = services[index];
-                      final data = service.data() as Map<String, dynamic>;
-
-                      return Card(
-                        margin: const EdgeInsets.all(8),
-                        child: ListTile(
-                          title: Text(data['serviceName'] ?? ''),
-                          subtitle: Text(
-                            '${data['price']} ريال - ${data['durationMinutes']} دقيقة',
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              deleteService(service.id);
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-            const Divider(),
-
-            Padding(
-              padding: const EdgeInsets.all(12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'اسم الخدمة',
-                      border: OutlineInputBorder(),
+                  Text(
+                    serviceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppGlassUi.darkText,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
-                  TextField(
-                    controller: priceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'السعر',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  TextField(
-                    controller: durationController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'مدة الخدمة بالدقائق',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: addService,
-                      child: const Text('إضافة خدمة'),
-                    ),
+                  AppInfoRow(
+                    icon: Icons.payments_rounded,
+                    text: '$price ريال - $duration دقيقة',
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            AppCircleIconButton(
+              icon: Icons.delete_rounded,
+              tooltip: 'حذف الخدمة',
+              onTap: () => deleteService(service.id),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _servicesList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('services')
+          .where('washId', isEqualTo: SessionService.currentWashId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const AppLoadingState();
+        }
+
+        final services = snapshot.data!.docs;
+
+        if (services.isEmpty) {
+          return const AppEmptyState(
+            title: 'لا توجد خدمات مضافة حالياً',
+            icon: Icons.design_services_outlined,
+          );
+        }
+
+        return Column(children: services.map(_serviceCard).toList());
+      },
+    );
+  }
+
+  Widget _addServiceForm() {
+    return AppGlassCard(
+      child: Column(
+        children: [
+          const AppSectionTitle(
+            title: 'إضافة خدمة',
+            subtitle: 'أدخل بيانات الخدمة كما ستظهر للعميل',
+            icon: Icons.add_circle_rounded,
+          ),
+          const SizedBox(height: 14),
+          AppTextField(
+            controller: nameController,
+            label: 'اسم الخدمة',
+            icon: Icons.local_car_wash_rounded,
+          ),
+          const SizedBox(height: 10),
+          AppTextField(
+            controller: priceController,
+            label: 'السعر',
+            icon: Icons.payments_rounded,
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 10),
+          AppTextField(
+            controller: durationController,
+            label: 'مدة الخدمة بالدقائق',
+            icon: Icons.timer_rounded,
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 15),
+          AppGradientButton(
+            title: 'إضافة خدمة',
+            icon: Icons.add_rounded,
+            onTap: addService,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AppGlassScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppGlassTopBar(
+              title: 'إدارة الخدمات',
+              leadingIcon: Icons.arrow_back_rounded,
+              leadingTooltip: 'رجوع',
+            ),
+            const SizedBox(height: 18),
+            _addServiceForm(),
+            const SizedBox(height: 18),
+            const AppSectionTitle(
+              title: 'الخدمات الحالية',
+              subtitle: 'الخدمات المرتبطة بهذه المغسلة',
+              icon: Icons.list_alt_rounded,
+            ),
+            const SizedBox(height: 12),
+            _servicesList(),
           ],
         ),
       ),

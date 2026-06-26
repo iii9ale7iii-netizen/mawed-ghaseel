@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/firebase_auth_service.dart';
+import '../theme/app_colors.dart';
 import 'customer_home_screen.dart';
 import 'customer_register_screen.dart';
 
@@ -18,14 +20,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   final FocusNode passwordFocusNode = FocusNode();
 
   bool isLoading = false;
+  bool isResettingPassword = false;
   bool obscurePassword = true;
-
-  static const Color primaryBlue = Color(0xFF0F56B3);
-  static const Color brightBlue = Color(0xFF2196E8);
-  static const Color softBackground = Color(0xFFEAF6FF);
-  static const Color textDark = Color(0xFF0D2B4F);
-  static const Color textMuted = Color(0xFF63758D);
-  static const Color borderColor = Color(0xFFD9E9F7);
 
   @override
   void initState() {
@@ -71,6 +67,83 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     );
   }
 
+  void _showForgotPasswordMessage() {
+    _sendPasswordResetEmail();
+  }
+
+  Future<void> _sendPasswordResetEmail() async {
+    if (isResettingPassword || isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اكتب البريد الإلكتروني أولاً لاستعادة كلمة المرور'),
+        ),
+      );
+      emailFocusNode.requestFocus();
+      return;
+    }
+
+    final emailRegExp = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!emailRegExp.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('صيغة البريد الإلكتروني غير صحيحة')),
+      );
+      emailFocusNode.requestFocus();
+      return;
+    }
+
+    setState(() {
+      isResettingPassword = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني',
+          ),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String message = 'تعذر إرسال رابط استعادة كلمة المرور';
+
+      if (e.code == 'user-not-found') {
+        message = 'لا يوجد حساب مسجل بهذا البريد الإلكتروني';
+      } else if (e.code == 'invalid-email') {
+        message = 'صيغة البريد الإلكتروني غير صحيحة';
+      } else if (e.code == 'too-many-requests') {
+        message = 'تمت محاولات كثيرة، حاول مرة أخرى لاحقاً';
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حدث خطأ غير متوقع، حاول مرة أخرى')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isResettingPassword = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -87,95 +160,312 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: softBackground,
-        body: Stack(
-          children: [
-            const _PremiumBackground(),
-            SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 430),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _HeaderCard(onBack: () => Navigator.pop(context)),
-                        const SizedBox(height: 20),
-                        _LoginCard(
-                          emailController: emailController,
-                          passwordController: passwordController,
-                          emailFocusNode: emailFocusNode,
-                          passwordFocusNode: passwordFocusNode,
-                          obscurePassword: obscurePassword,
-                          isLoading: isLoading,
-                          onTogglePassword: () {
-                            setState(() {
-                              obscurePassword = !obscurePassword;
-                            });
-                          },
-                          onLogin: login,
-                          onCreateAccount: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const CustomerRegisterScreen(),
-                              ),
-                            );
-                          },
+        backgroundColor: const Color(0xFFEAF5FF),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final double frameWidth = constraints.maxWidth > 460
+                ? 430
+                : constraints.maxWidth;
+
+            return Center(
+              child: SizedBox(
+                width: frameWidth,
+                height: constraints.maxHeight,
+                child: ClipRRect(
+                  borderRadius: constraints.maxWidth > 460
+                      ? BorderRadius.circular(28)
+                      : BorderRadius.zero,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image.asset(
+                          'assets/images/welcome_background.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.bottomRight,
                         ),
-                      ],
-                    ),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.72),
+                                Colors.white.withValues(alpha: 0.48),
+                                Colors.white.withValues(alpha: 0.22),
+                                Colors.white.withValues(alpha: 0.08),
+                              ],
+                              stops: const [0.0, 0.38, 0.72, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.20),
+                                Colors.white.withValues(alpha: 0.04),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      SafeArea(
+                        child: ScrollConfiguration(
+                          behavior: const _NoGlowScrollBehavior(),
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  16,
+                                  18,
+                                  16,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.topRight,
+                                      child: _TopBackButton(
+                                        onTap: () => Navigator.pop(context),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const _BrandLogo(size: 104),
+                                    const SizedBox(height: 15),
+                                    const Text(
+                                      'دخول العميل',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 31,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.primaryDark,
+                                        height: 1.15,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.white,
+                                            blurRadius: 12,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    const Text(
+                                      'سجل دخولك للوصول إلى حجوزاتك وإدارة مواعيد غسيل سيارتك بكل سهولة.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textPrimary,
+                                        height: 1.55,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.white,
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 22),
+                                    _LoginGlassCard(
+                                      emailController: emailController,
+                                      passwordController: passwordController,
+                                      emailFocusNode: emailFocusNode,
+                                      passwordFocusNode: passwordFocusNode,
+                                      obscurePassword: obscurePassword,
+                                      isLoading: isLoading,
+                                      onTogglePassword: () {
+                                        setState(() {
+                                          obscurePassword = !obscurePassword;
+                                        });
+                                      },
+                                      onForgotPassword:
+                                          _showForgotPasswordMessage,
+                                      onLogin: login,
+                                      onCreateAccount: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CustomerRegisterScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _PremiumBackground extends StatelessWidget {
-  const _PremiumBackground();
+class _LoginGlassCard extends StatelessWidget {
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final FocusNode emailFocusNode;
+  final FocusNode passwordFocusNode;
+  final bool obscurePassword;
+  final bool isLoading;
+  final VoidCallback onTogglePassword;
+  final VoidCallback onForgotPassword;
+  final VoidCallback onLogin;
+  final VoidCallback onCreateAccount;
+
+  const _LoginGlassCard({
+    required this.emailController,
+    required this.passwordController,
+    required this.emailFocusNode,
+    required this.passwordFocusNode,
+    required this.obscurePassword,
+    required this.isLoading,
+    required this.onTogglePassword,
+    required this.onForgotPassword,
+    required this.onLogin,
+    required this.onCreateAccount,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFEAF6FF), Color(0xFFF8FCFF), Color(0xFFEFF8FF)],
+    return _GlassCard(
+      child: Column(
+        children: [
+          const _SectionTitle(
+            title: 'بيانات الدخول',
+            icon: Icons.account_circle,
+          ),
+          const SizedBox(height: 18),
+          _GlassTextField(
+            controller: emailController,
+            focusNode: emailFocusNode,
+            hintText: 'البريد الإلكتروني',
+            icon: Icons.email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          _GlassTextField(
+            controller: passwordController,
+            focusNode: passwordFocusNode,
+            hintText: 'كلمة المرور',
+            icon: Icons.lock_rounded,
+            obscureText: obscurePassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => onLogin(),
+            suffixIcon: IconButton(
+              tooltip: obscurePassword
+                  ? 'إظهار كلمة المرور'
+                  : 'إخفاء كلمة المرور',
+              onPressed: onTogglePassword,
+              icon: Icon(
+                obscurePassword
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          top: -85,
-          right: -70,
-          child: _BlurCircle(
-            size: 190,
-            color: const Color(0xFF69BDF4).withAlpha(74),
+          const SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: onForgotPassword,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'نسيت كلمة المرور؟',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+              ),
+            ),
           ),
-        ),
-        Positioned(
-          top: 240,
-          left: -100,
-          child: _BlurCircle(
-            size: 210,
-            color: const Color(0xFF4BB7E8).withAlpha(50),
+          const SizedBox(height: 10),
+          _PrimaryButton(
+            text: 'تسجيل الدخول',
+            icon: Icons.login_rounded,
+            isLoading: isLoading,
+            onPressed: onLogin,
           ),
-        ),
-        Positioned(
-          bottom: -80,
-          right: -70,
-          child: _BlurCircle(
-            size: 200,
-            color: const Color(0xFF0F56B3).withAlpha(31),
+          const SizedBox(height: 18),
+          const _OrDivider(),
+          const SizedBox(height: 18),
+          _CreateAccountButton(onTap: onCreateAccount),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+
+  const _GlassCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.91),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.09),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final IconData icon;
+
+  const _SectionTitle({required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: AppColors.primary, size: 26),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.primaryDark,
+            fontSize: 21,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ],
@@ -183,108 +473,331 @@ class _PremiumBackground extends StatelessWidget {
   }
 }
 
-class _BlurCircle extends StatelessWidget {
-  final double size;
-  final Color color;
+class _GlassTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hintText;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool obscureText;
+  final Widget? suffixIcon;
+  final ValueChanged<String>? onSubmitted;
 
-  const _BlurCircle({required this.size, required this.color});
+  const _GlassTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.hintText,
+    required this.icon,
+    this.keyboardType,
+    this.textInputAction,
+    this.obscureText = false,
+    this.suffixIcon,
+    this.onSubmitted,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-}
+    final bool isFocused = focusNode.hasFocus;
 
-class _HeaderCard extends StatelessWidget {
-  final VoidCallback onBack;
-
-  const _HeaderCard({required this.onBack});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      height: 56,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        color: Colors.white.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFocused ? AppColors.primary : const Color(0xFFD7EAFA),
+          width: isFocused ? 1.6 : 1.1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F56B3).withAlpha(20),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            color: AppColors.primaryDark.withValues(
+              alpha: isFocused ? 0.12 : 0.04,
+            ),
+            blurRadius: isFocused ? 14 : 8,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.topCenter,
-        children: [
-          Align(
-            alignment: Alignment.topRight,
-            child: _CircleIconButton(
-              icon: Icons.arrow_forward_ios_rounded,
-              onTap: onBack,
-            ),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        obscureText: obscureText,
+        onSubmitted: onSubmitted,
+        cursorColor: AppColors.primary,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w800,
+          fontSize: 14.5,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
           ),
-          Column(
-            children: [
-              const _BrandLogo(size: 96),
-              const SizedBox(height: 18),
-              const Text(
-                'أهلاً بك في موعد غسيل',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _CustomerLoginScreenState.primaryBlue,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'سجل دخولك للوصول إلى حجوزاتك وإدارة مواعيد غسيل سيارتك بكل سهولة.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _CustomerLoginScreenState.textMuted,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  height: 1.7,
-                ),
-              ),
-            ],
+          prefixIcon: Icon(icon, color: AppColors.primaryDark, size: 22),
+          suffixIcon: suffixIcon,
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _CircleIconButton extends StatelessWidget {
+class _PrimaryButton extends StatefulWidget {
+  final String text;
   final IconData icon;
-  final VoidCallback onTap;
+  final bool isLoading;
+  final VoidCallback onPressed;
 
-  const _CircleIconButton({required this.icon, required this.onTap});
+  const _PrimaryButton({
+    required this.text,
+    required this.icon,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  State<_PrimaryButton> createState() => _PrimaryButtonState();
+}
+
+class _PrimaryButtonState extends State<_PrimaryButton> {
+  bool isHovering = false;
+  bool isPressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFF2F8FF),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isHovering = true),
+      onExit: (_) => setState(() => isHovering = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => isPressed = true),
+        onTapCancel: () => setState(() => isPressed = false),
+        onTapUp: (_) => setState(() => isPressed = false),
+        child: AnimatedScale(
+          scale: isPressed ? 0.985 : 1,
+          duration: const Duration(milliseconds: 110),
+          child: SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton.icon(
+              onPressed: widget.isLoading ? null : widget.onPressed,
+              icon: widget.isLoading
+                  ? const SizedBox.shrink()
+                  : Icon(widget.icon, size: 22),
+              label: widget.isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.6,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(widget.text),
+              style: ElevatedButton.styleFrom(
+                elevation: isHovering ? 9 : 7,
+                shadowColor: AppColors.primaryDark.withValues(alpha: 0.25),
+                backgroundColor: isHovering
+                    ? const Color(0xFF229BEA)
+                    : AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.65,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateAccountButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _CreateAccountButton({required this.onTap});
+
+  @override
+  State<_CreateAccountButton> createState() => _CreateAccountButtonState();
+}
+
+class _CreateAccountButtonState extends State<_CreateAccountButton> {
+  bool isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isHovering = true),
+      onExit: (_) => setState(() => isHovering = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isHovering
+              ? Colors.white.withValues(alpha: 0.90)
+              : Colors.white.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryDark.withValues(
+                alpha: isHovering ? 0.13 : 0.06,
+              ),
+              blurRadius: isHovering ? 18 : 10,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_add_alt_1_rounded,
+                      color: AppColors.primary,
+                      size: 25,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ليس لديك حساب؟',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'إنشاء حساب جديد',
+                          style: TextStyle(
+                            color: AppColors.primaryDark,
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(color: AppColors.border.withValues(alpha: 0.8)),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
           width: 38,
           height: 38,
-          child: Icon(
-            icon,
-            color: _CustomerLoginScreenState.primaryBlue,
-            size: 18,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.82),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border),
           ),
+          child: const Center(
+            child: Text(
+              'أو',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: AppColors.border.withValues(alpha: 0.8)),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopBackButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _TopBackButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: IconButton(
+        onPressed: onTap,
+        icon: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          color: AppColors.primaryDark,
+          size: 21,
         ),
       ),
     );
@@ -301,14 +814,14 @@ class _BrandLogo extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      padding: EdgeInsets.all(size * 0.08),
+      padding: EdgeInsets.all(size * 0.055),
       decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.97),
         shape: BoxShape.circle,
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFD8ECFF), width: 1.2),
+        border: Border.all(color: const Color(0xFFD8ECFF), width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F56B3).withAlpha(32),
+            color: AppColors.primaryDark.withValues(alpha: 0.18),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -318,10 +831,10 @@ class _BrandLogo extends StatelessWidget {
         'assets/images/logo_mawed_ghaseel.png',
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
-          return const Icon(
+          return Icon(
             Icons.local_car_wash_rounded,
-            color: _CustomerLoginScreenState.brightBlue,
-            size: 48,
+            color: AppColors.primaryDark,
+            size: size * 0.52,
           );
         },
       ),
@@ -329,395 +842,15 @@ class _BrandLogo extends StatelessWidget {
   }
 }
 
-class _LoginCard extends StatelessWidget {
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final FocusNode emailFocusNode;
-  final FocusNode passwordFocusNode;
-  final bool obscurePassword;
-  final bool isLoading;
-  final VoidCallback onTogglePassword;
-  final VoidCallback onLogin;
-  final VoidCallback onCreateAccount;
-
-  const _LoginCard({
-    required this.emailController,
-    required this.passwordController,
-    required this.emailFocusNode,
-    required this.passwordFocusNode,
-    required this.obscurePassword,
-    required this.isLoading,
-    required this.onTogglePassword,
-    required this.onLogin,
-    required this.onCreateAccount,
-  });
+class _NoGlowScrollBehavior extends ScrollBehavior {
+  const _NoGlowScrollBehavior();
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F56B3).withAlpha(24),
-            blurRadius: 30,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.account_circle_rounded,
-                color: _CustomerLoginScreenState.brightBlue,
-                size: 27,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'بيانات الدخول',
-                style: TextStyle(
-                  color: _CustomerLoginScreenState.primaryBlue,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 25),
-          _PremiumTextField(
-            controller: emailController,
-            focusNode: emailFocusNode,
-            hintText: 'البريد الإلكتروني',
-            keyboardType: TextInputType.emailAddress,
-            prefixIcon: Icons.email_rounded,
-            textInputAction: TextInputAction.next,
-            onSubmitted: (_) => passwordFocusNode.requestFocus(),
-          ),
-          const SizedBox(height: 14),
-          _PremiumTextField(
-            controller: passwordController,
-            focusNode: passwordFocusNode,
-            hintText: 'كلمة المرور',
-            prefixIcon: Icons.lock_rounded,
-            obscureText: obscurePassword,
-            suffixIcon: obscurePassword
-                ? Icons.visibility_off_rounded
-                : Icons.visibility_rounded,
-            onSuffixTap: onTogglePassword,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => onLogin(),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: isLoading ? null : () {},
-              style: TextButton.styleFrom(
-                foregroundColor: _CustomerLoginScreenState.textMuted,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(10, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'نسيت كلمة المرور؟',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _LoginButton(isLoading: isLoading, onPressed: onLogin),
-          const SizedBox(height: 22),
-          const _OrDivider(),
-          const SizedBox(height: 22),
-          _CreateAccountCard(isLoading: isLoading, onPressed: onCreateAccount),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final String hintText;
-  final IconData prefixIcon;
-  final IconData? suffixIcon;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final bool obscureText;
-  final VoidCallback? onSuffixTap;
-  final ValueChanged<String>? onSubmitted;
-
-  const _PremiumTextField({
-    required this.controller,
-    required this.focusNode,
-    required this.hintText,
-    required this.prefixIcon,
-    this.suffixIcon,
-    this.keyboardType,
-    this.textInputAction,
-    this.obscureText = false,
-    this.onSuffixTap,
-    this.onSubmitted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isFocused = focusNode.hasFocus;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: isFocused
-            ? [
-                BoxShadow(
-                  color: _CustomerLoginScreenState.brightBlue.withAlpha(38),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ]
-            : [],
-      ),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        style: const TextStyle(
-          color: _CustomerLoginScreenState.textDark,
-          fontSize: 15.5,
-          fontWeight: FontWeight.w700,
-        ),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: const TextStyle(
-            color: _CustomerLoginScreenState.textMuted,
-            fontWeight: FontWeight.w700,
-          ),
-          filled: true,
-          fillColor: isFocused ? Colors.white : const Color(0xFFF8FBFF),
-          prefixIcon: Icon(
-            prefixIcon,
-            color: isFocused
-                ? _CustomerLoginScreenState.brightBlue
-                : _CustomerLoginScreenState.primaryBlue,
-          ),
-          suffixIcon: suffixIcon == null
-              ? null
-              : IconButton(
-                  onPressed: onSuffixTap,
-                  icon: Icon(
-                    suffixIcon,
-                    color: isFocused
-                        ? _CustomerLoginScreenState.brightBlue
-                        : _CustomerLoginScreenState.textMuted,
-                  ),
-                ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 18,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: _CustomerLoginScreenState.borderColor,
-              width: 1.2,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: _CustomerLoginScreenState.brightBlue,
-              width: 1.6,
-            ),
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoginButton extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  const _LoginButton({required this.isLoading, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 160),
-      opacity: isLoading ? 0.85 : 1,
-      child: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
-            colors: [
-              _CustomerLoginScreenState.brightBlue,
-              _CustomerLoginScreenState.primaryBlue,
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: _CustomerLoginScreenState.primaryBlue.withAlpha(62),
-              blurRadius: 18,
-              offset: const Offset(0, 9),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: isLoading ? null : onPressed,
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                      width: 25,
-                      height: 25,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.7,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.login_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        SizedBox(width: 9),
-                        Text(
-                          'تسجيل الدخول',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider(color: Color(0xFFE2EEF8), thickness: 1)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            'أو',
-            style: TextStyle(
-              color: _CustomerLoginScreenState.textMuted,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Expanded(child: Divider(color: Color(0xFFE2EEF8), thickness: 1)),
-      ],
-    );
-  }
-}
-
-class _CreateAccountCard extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  const _CreateAccountCard({required this.isLoading, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFF4FAFF),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: isLoading ? null : onPressed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFD9ECFC), width: 1.2),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      _CustomerLoginScreenState.brightBlue,
-                      _CustomerLoginScreenState.primaryBlue,
-                    ],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.person_add_alt_1_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ليس لديك حساب؟',
-                      style: TextStyle(
-                        color: _CustomerLoginScreenState.textMuted,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'إنشاء حساب جديد',
-                      style: TextStyle(
-                        color: _CustomerLoginScreenState.primaryBlue,
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/booking_status_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_glass_ui.dart';
 
@@ -26,7 +27,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       );
     }
   }
-
 
   Future<void> confirmCancelBooking(
     BuildContext context,
@@ -60,35 +60,16 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
   }
 
-  Color statusColor(String status) {
-    if (status == 'ظ…ظ‚ط¨ظˆظ„' || status == 'مقبول') return Colors.green;
-    if (status == 'ظ…ط±ظپظˆط¶' || status == 'مرفوض') return Colors.red;
-    return Colors.orange;
-  }
-
-
-  bool isPendingStatus(String status) {
-    return status == 'بانتظار الموافقة' ||
-        status == 'ط¨ط§ظ†طھط¸ط§ط± ط§ظ„ظ…ظˆط§ظپظ‚ط©' ||
-        status == 'ط·آ¨ط·آ§ط¸â€ ط·ع¾ط·آ¸ط·آ§ط·آ± ط·آ§ط¸â€‍ط¸â€¦ط¸ث†ط·آ§ط¸ظ¾ط¸â€ڑط·آ©';
-  }
-
-  bool isAcceptedStatus(String status) {
-    return status == 'مقبول' ||
-        status == 'ظ…ظ‚ط¨ظˆظ„' ||
-        status == 'ط¸â€¦ط¸â€ڑط·آ¨ط¸ث†ط¸â€‍';
-  }
-
-  bool isRejectedStatus(String status) {
-    return status == 'مرفوض' ||
-        status == 'ظ…ط±ظپظˆط¶' ||
-        status == 'ط¸â€¦ط·آ±ط¸ظ¾ط¸ث†ط·آ¶';
-  }
-
   bool matchesStatusFilter(String status) {
-    if (selectedStatusFilter == 'pending') return isPendingStatus(status);
-    if (selectedStatusFilter == 'accepted') return isAcceptedStatus(status);
-    if (selectedStatusFilter == 'rejected') return isRejectedStatus(status);
+    if (selectedStatusFilter == 'pending') {
+      return BookingStatusService.isPending(status);
+    }
+    if (selectedStatusFilter == 'accepted') {
+      return BookingStatusService.isAccepted(status);
+    }
+    if (selectedStatusFilter == 'rejected') {
+      return BookingStatusService.isRejected(status);
+    }
     return true;
   }
 
@@ -108,13 +89,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (firstCreatedAt is Timestamp) return -1;
     if (secondCreatedAt is Timestamp) return 1;
     return 0;
-  }
-
-
-  String statusLabel(String status) {
-    if (isAcceptedStatus(status)) return 'مقبول';
-    if (isRejectedStatus(status)) return 'مرفوض';
-    return 'بانتظار الموافقة';
   }
 
   Widget _filterChip(String label, String value, IconData icon) {
@@ -172,7 +146,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     QueryDocumentSnapshot booking,
     Map<String, dynamic> data,
   ) {
-    final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+    final status = data['status']?.toString() ?? BookingStatusService.pending;
     final hasDiscount = data['hasDiscount'] == true;
     final couponCode = data['couponCode']?.toString() ?? '';
     final discountPercentage = data['discountPercentage']?.toString() ?? '0';
@@ -203,8 +177,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: AppStatusChip(
-                    label: statusLabel(status),
-                    color: statusColor(status),
+                    label: BookingStatusService.label(status),
+                    color: BookingStatusService.color(status),
                   ),
                 ),
               ],
@@ -259,8 +233,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 ),
               ),
             ],
-            if (status == 'بانتظار الموافقة' ||
-                status == 'ط¨ط§ظ†طھط¸ط§ط± ط§ظ„ظ…ظˆط§ظپظ‚ط©') ...[
+            if (BookingStatusService.isPending(status)) ...[
               const SizedBox(height: 15),
               AppGradientButton(
                 title: 'إلغاء الحجز',
@@ -295,7 +268,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
         final bookings = snapshot.data!.docs.where((booking) {
           final data = booking.data() as Map<String, dynamic>;
-          final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+          final status = data['status']?.toString() ?? BookingStatusService.pending;
           return matchesStatusFilter(status);
         }).toList();
 

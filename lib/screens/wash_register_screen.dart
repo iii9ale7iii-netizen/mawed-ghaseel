@@ -129,7 +129,7 @@ class _WashRegisterScreenState extends State<WashRegisterScreen> {
               const SizedBox(height: 15),
 
               DropdownButtonFormField<String>(
-                value: washType,
+                initialValue: washType,
                 decoration: const InputDecoration(
                   labelText: 'نوع المغسلة',
                   border: OutlineInputBorder(),

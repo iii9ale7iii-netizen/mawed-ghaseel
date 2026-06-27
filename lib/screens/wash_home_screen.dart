@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../main.dart';
+import '../services/booking_status_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_glass_ui.dart';
 import 'service_management_screen.dart';
@@ -43,10 +44,12 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     String status,
     Map<String, dynamic> bookingData,
   ) async {
+    final normalizedStatus = BookingStatusService.normalize(status);
+
     await FirebaseFirestore.instance
         .collection('bookings')
         .doc(bookingId)
-        .update({'status': status});
+        .update({'status': normalizedStatus});
 
     final customerId = bookingData['customerId']?.toString() ?? '';
     final washName = SessionService.currentWashName ?? 'المغسلة';
@@ -54,7 +57,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     final date = bookingData['date']?.toString() ?? '';
     final time = bookingData['time']?.toString() ?? '';
 
-    if (status == 'مقبول' || status == 'ظ…ظ‚ط¨ظˆظ„') {
+    if (BookingStatusService.isAccepted(normalizedStatus)) {
       await createCustomerNotification(
         customerId: customerId,
         bookingId: bookingId,
@@ -62,7 +65,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
         body:
             'تم قبول حجز خدمة $serviceName لدى $washName بتاريخ $date الساعة $time',
       );
-    } else if (status == 'مرفوض' || status == 'ظ…ط±ظپظˆط¶') {
+    } else if (BookingStatusService.isRejected(normalizedStatus)) {
       await createCustomerNotification(
         customerId: customerId,
         bookingId: bookingId,
@@ -75,7 +78,11 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تم تحديث حالة الحجز إلى $status')),
+      SnackBar(
+        content: Text(
+          'تم تحديث حالة الحجز إلى ${BookingStatusService.label(normalizedStatus)}',
+        ),
+      ),
     );
   }
 
@@ -112,11 +119,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
           .map((doc) => doc.data()['notificationId']?.toString() ?? '')
           .toSet();
 
-      final unreadCount = notifications
-          .where((doc) => !readIds.contains(doc.id))
-          .length;
-
-      yield unreadCount;
+      yield notifications.where((doc) => !readIds.contains(doc.id)).length;
     }
   }
 
@@ -186,35 +189,16 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     );
   }
 
-  Color statusColor(String status) {
-    if (status == 'ظ…ظ‚ط¨ظˆظ„' || status == 'مقبول') return Colors.green;
-    if (status == 'ظ…ط±ظپظˆط¶' || status == 'مرفوض') return Colors.red;
-    return Colors.orange;
-  }
-
-
-  bool isPendingStatus(String status) {
-    return status == 'بانتظار الموافقة' ||
-        status == 'ط¨ط§ظ†طھط¸ط§ط± ط§ظ„ظ…ظˆط§ظپظ‚ط©' ||
-        status == 'ط·آ¨ط·آ§ط¸â€ ط·ع¾ط·آ¸ط·آ§ط·آ± ط·آ§ط¸â€‍ط¸â€¦ط¸ث†ط·آ§ط¸ظ¾ط¸â€ڑط·آ©';
-  }
-
-  bool isAcceptedStatus(String status) {
-    return status == 'مقبول' ||
-        status == 'ظ…ظ‚ط¨ظˆظ„' ||
-        status == 'ط¸â€¦ط¸â€ڑط·آ¨ط¸ث†ط¸â€‍';
-  }
-
-  bool isRejectedStatus(String status) {
-    return status == 'مرفوض' ||
-        status == 'ظ…ط±ظپظˆط¶' ||
-        status == 'ط¸â€¦ط·آ±ط¸ظ¾ط¸ث†ط·آ¶';
-  }
-
   bool matchesStatusFilter(String status) {
-    if (selectedStatusFilter == 'pending') return isPendingStatus(status);
-    if (selectedStatusFilter == 'accepted') return isAcceptedStatus(status);
-    if (selectedStatusFilter == 'rejected') return isRejectedStatus(status);
+    if (selectedStatusFilter == 'pending') {
+      return BookingStatusService.isPending(status);
+    }
+    if (selectedStatusFilter == 'accepted') {
+      return BookingStatusService.isAccepted(status);
+    }
+    if (selectedStatusFilter == 'rejected') {
+      return BookingStatusService.isRejected(status);
+    }
     return true;
   }
 
@@ -277,13 +261,6 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
     );
   }
 
-
-  String statusLabel(String status) {
-    if (isAcceptedStatus(status)) return 'مقبول';
-    if (isRejectedStatus(status)) return 'مرفوض';
-    return 'بانتظار الموافقة';
-  }
-
   Widget _filterChip(String label, String value, IconData icon) {
     final selected = selectedStatusFilter == value;
 
@@ -336,7 +313,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
 
   Widget bookingCard(QueryDocumentSnapshot booking) {
     final data = booking.data() as Map<String, dynamic>;
-    final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+    final status = data['status']?.toString() ?? BookingStatusService.pending;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -364,8 +341,8 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: AppStatusChip(
-                    label: statusLabel(status),
-                    color: statusColor(status),
+                    label: BookingStatusService.label(status),
+                    color: BookingStatusService.color(status),
                   ),
                 ),
               ],
@@ -410,7 +387,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
                 ),
               ),
             ],
-            if (isPendingStatus(status)) ...[
+            if (BookingStatusService.isPending(status)) ...[
               const SizedBox(height: 15),
               Row(
                 children: [
@@ -418,7 +395,11 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
                     child: AppGradientButton(
                       title: 'قبول',
                       icon: Icons.check_rounded,
-                      onTap: () => updateStatus(booking.id, 'مقبول', data),
+                      onTap: () => updateStatus(
+                        booking.id,
+                        BookingStatusService.accepted,
+                        data,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -427,7 +408,11 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
                       title: 'رفض',
                       icon: Icons.close_rounded,
                       danger: true,
-                      onTap: () => updateStatus(booking.id, 'مرفوض', data),
+                      onTap: () => updateStatus(
+                        booking.id,
+                        BookingStatusService.rejected,
+                        data,
+                      ),
                     ),
                   ),
                 ],
@@ -466,7 +451,7 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
 
         final bookings = snapshot.data!.docs.where((booking) {
           final data = booking.data() as Map<String, dynamic>;
-          final status = data['status']?.toString() ?? 'بانتظار الموافقة';
+          final status = data['status']?.toString() ?? BookingStatusService.pending;
           return matchesStatusFilter(status);
         }).toList();
 

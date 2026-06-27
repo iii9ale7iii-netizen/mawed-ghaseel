@@ -149,7 +149,7 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
           ),
           Switch(
             value: bookingEnabled,
-            activeColor: AppGlassUi.primary,
+            activeThumbColor: AppGlassUi.primary,
             onChanged: (value) {
               setState(() {
                 bookingEnabled = value;
@@ -226,7 +226,7 @@ class _WorkingHoursScreenState extends State<WorkingHoursScreen> {
                 ),
                 Switch(
                   value: enabled,
-                  activeColor: AppGlassUi.primary,
+                  activeThumbColor: AppGlassUi.primary,
                   onChanged: (value) {
                     setState(() {
                       dayData['enabled'] = value;

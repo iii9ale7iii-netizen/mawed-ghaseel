@@ -230,7 +230,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                 }
 
                 return DropdownButtonFormField<String>(
-                  value: selectedWashId.isEmpty ? null : selectedWashId,
+                  initialValue: selectedWashId.isEmpty ? null : selectedWashId,
                   decoration: const InputDecoration(
                     labelText: 'اختر المغسلة المعلنة',
                     border: OutlineInputBorder(),
@@ -334,7 +334,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             const SizedBox(height: 12),
 
             DropdownButtonFormField<String>(
-              value: target,
+              initialValue: target,
               decoration: const InputDecoration(
                 labelText: 'الفئة التي سيظهر لها الإعلان',
                 border: OutlineInputBorder(),

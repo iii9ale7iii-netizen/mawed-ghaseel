@@ -165,7 +165,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     border: Border.all(color: Colors.white, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFE11D48).withOpacity(0.26),
+                        color: const Color(0xFFE11D48).withValues(alpha: 0.26),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -222,7 +222,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 itemCount: visibleAds.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   return _paidAdCard(context, visibleAds[index]);
                 },
@@ -265,12 +265,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.90),
+                color: Colors.white.withValues(alpha: 0.90),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withOpacity(0.92)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.92)),
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withOpacity(0.08),
+                    color: _primary.withValues(alpha: 0.08),
                     blurRadius: 18,
                     offset: const Offset(0, 8),
                   ),
@@ -285,7 +285,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: _secondary.withOpacity(0.13),
+                          color: _secondary.withValues(alpha: 0.13),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: const Color(0xFFD9ECFF)),
                         ),
@@ -590,9 +590,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withOpacity(0.74),
-                                Colors.white.withOpacity(0.84),
-                                const Color(0xFFEAF6FF).withOpacity(0.92),
+                                Colors.white.withValues(alpha: 0.74),
+                                Colors.white.withValues(alpha: 0.84),
+                                const Color(0xFFEAF6FF).withValues(alpha: 0.92),
                               ],
                             ),
                           ),
@@ -660,22 +660,22 @@ class _TopBar extends StatelessWidget {
 class _GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final BorderRadiusGeometry borderRadius;
 
   const _GlassCard({
     required this.child,
     this.padding = const EdgeInsets.all(18),
-    this.borderRadius = const BorderRadius.all(Radius.circular(26)),
   });
 
   @override
   Widget build(BuildContext context) {
+    const borderRadius = BorderRadius.all(Radius.circular(26));
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: _CustomerHomeScreenState._primary.withOpacity(0.08),
+            color: _CustomerHomeScreenState._primary.withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -688,9 +688,9 @@ class _GlassCard extends StatelessWidget {
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.84),
+              color: Colors.white.withValues(alpha: 0.84),
               borderRadius: borderRadius,
-              border: Border.all(color: Colors.white.withOpacity(0.84)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.84)),
             ),
             child: child,
           ),
@@ -711,9 +711,9 @@ class _SmallLoadingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.80),
+        color: Colors.white.withValues(alpha: 0.80),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.82)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
       ),
       child: Row(
         children: [
@@ -770,7 +770,7 @@ class _SectionTitle extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: _CustomerHomeScreenState._primary.withOpacity(0.16),
+                color: _CustomerHomeScreenState._primary.withValues(alpha: 0.16),
                 blurRadius: 15,
                 offset: const Offset(0, 7),
               ),
@@ -836,12 +836,12 @@ class _HomeActionCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.86),
+            color: Colors.white.withValues(alpha: 0.86),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: const Color(0xFFD9ECFF)),
             boxShadow: [
               BoxShadow(
-                color: _CustomerHomeScreenState._primary.withOpacity(0.06),
+                color: _CustomerHomeScreenState._primary.withValues(alpha: 0.06),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -912,12 +912,12 @@ class _DisabledHomeActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.78),
+          color: Colors.white.withValues(alpha: 0.78),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: const Color(0xFFD9ECFF)),
           boxShadow: [
             BoxShadow(
-              color: _CustomerHomeScreenState._primary.withOpacity(0.04),
+              color: _CustomerHomeScreenState._primary.withValues(alpha: 0.04),
               blurRadius: 14,
               offset: const Offset(0, 7),
             ),
@@ -1013,15 +1013,15 @@ class _ActionIcon extends StatelessWidget {
             : null,
         color: active
             ? null
-            : _CustomerHomeScreenState._secondary.withOpacity(0.14),
+            : _CustomerHomeScreenState._secondary.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(17),
         border: active
             ? null
-            : Border.all(color: Colors.white.withOpacity(0.86)),
+            : Border.all(color: Colors.white.withValues(alpha: 0.86)),
         boxShadow: active
             ? [
                 BoxShadow(
-                  color: _CustomerHomeScreenState._primary.withOpacity(0.14),
+                  color: _CustomerHomeScreenState._primary.withValues(alpha: 0.14),
                   blurRadius: 14,
                   offset: const Offset(0, 7),
                 ),
@@ -1041,17 +1041,13 @@ class _GradientActionButton extends StatefulWidget {
   final String title;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool enabled;
   final bool danger;
-  final double height;
 
   const _GradientActionButton({
     required this.title,
     required this.icon,
     required this.onTap,
-    this.enabled = true,
     this.danger = false,
-    this.height = 54,
   });
 
   @override
@@ -1064,7 +1060,7 @@ class _GradientActionButtonState extends State<_GradientActionButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bool active = widget.enabled && widget.onTap != null;
+    final bool active = widget.onTap != null;
     final List<Color> colors = widget.danger
         ? const [Color(0xFFEF4444), Color(0xFFB91C1C)]
         : const [
@@ -1093,7 +1089,7 @@ class _GradientActionButtonState extends State<_GradientActionButton> {
             opacity: active ? 1 : 0.50,
             child: Container(
               width: double.infinity,
-              height: widget.height,
+              height: 54,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerRight,
@@ -1103,7 +1099,7 @@ class _GradientActionButtonState extends State<_GradientActionButton> {
                 borderRadius: BorderRadius.circular(17),
                 boxShadow: [
                   BoxShadow(
-                    color: colors.last.withOpacity(_hovered ? 0.28 : 0.18),
+                    color: colors.last.withValues(alpha: _hovered ? 0.28 : 0.18),
                     blurRadius: _hovered ? 20 : 14,
                     offset: const Offset(0, 7),
                   ),
@@ -1165,13 +1161,13 @@ class _CircleIconButtonState extends State<_CircleIconButton> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: _hovered ? Colors.white : Colors.white.withOpacity(0.82),
+              color: _hovered ? Colors.white : Colors.white.withValues(alpha: 0.82),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.90)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.90)),
               boxShadow: [
                 BoxShadow(
-                  color: _CustomerHomeScreenState._primary.withOpacity(
-                    _hovered ? 0.16 : 0.08,
+                  color: _CustomerHomeScreenState._primary.withValues(
+                    alpha: _hovered ? 0.16 : 0.08,
                   ),
                   blurRadius: _hovered ? 17 : 11,
                   offset: const Offset(0, 5),
@@ -1201,7 +1197,7 @@ class _MiniFeature extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.66),
+        color: Colors.white.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: const Color(0xFFD9ECFF)),
       ),
@@ -1239,7 +1235,7 @@ class _SoftCircle extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: _CustomerHomeScreenState._secondary.withOpacity(opacity),
+        color: _CustomerHomeScreenState._secondary.withValues(alpha: opacity),
         shape: BoxShape.circle,
       ),
     );

@@ -12,10 +12,13 @@ class AdminNotificationsScreen extends StatefulWidget {
 }
 
 class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
+  final pushTitleController = TextEditingController();
+  final pushBodyController = TextEditingController();
   final titleController = TextEditingController();
   final bodyController = TextEditingController();
   final paidAmountController = TextEditingController();
 
+  String pushTarget = 'customers';
   String target = 'customers';
   String selectedWashId = '';
   String selectedWashName = '';
@@ -24,6 +27,58 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   DateTime? endAt;
 
   bool isLoading = false;
+  bool isSendingPush = false;
+
+  Future<void> sendPushNotification() async {
+    if (pushTitleController.text.trim().isEmpty ||
+        pushBodyController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اكتب عنوان ونص الإشعار')),
+      );
+      return;
+    }
+
+    setState(() {
+      isSendingPush = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title': pushTitleController.text.trim(),
+        'body': pushBodyController.text.trim(),
+        'target': pushTarget,
+        'type': 'general',
+        'isActive': true,
+        'sendPush': true,
+        'pushStatus': 'pending',
+        'createdAt': Timestamp.now(),
+      });
+
+      pushTitleController.clear();
+      pushBodyController.clear();
+
+      if (!mounted) return;
+
+      setState(() {
+        pushTarget = 'customers';
+        isSendingPush = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال الإشعار')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isSendingPush = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
 
   Future<void> pickStartDate() async {
     final date = await showDatePicker(
@@ -165,6 +220,8 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
 
   @override
   void dispose() {
+    pushTitleController.dispose();
+    pushBodyController.dispose();
     titleController.dispose();
     bodyController.dispose();
     paidAmountController.dispose();
@@ -206,6 +263,69 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+
+            const Text(
+              'إرسال إشعار خارجي',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: pushTitleController,
+              decoration: const InputDecoration(
+                labelText: 'عنوان الإشعار',
+                hintText: 'مثال: عرض جديد اليوم',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: pushBodyController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'نص الإشعار',
+                hintText: 'اكتب الرسالة التي ستصل للجوالات',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            DropdownButtonFormField<String>(
+              initialValue: pushTarget,
+              decoration: const InputDecoration(
+                labelText: 'الفئة المستهدفة',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'customers', child: Text('العملاء')),
+                DropdownMenuItem(value: 'washes', child: Text('المغاسل')),
+                DropdownMenuItem(value: 'all', child: Text('الكل')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  pushTarget = value ?? 'customers';
+                });
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isSendingPush ? null : sendPushNotification,
+                icon: const Icon(Icons.notifications_active_rounded),
+                label: isSendingPush
+                    ? const Text('جاري الإرسال...')
+                    : const Text('إرسال إشعار للجوالات'),
+              ),
+            ),
+
+            const Divider(height: 35),
             const Text(
               'إضافة إعلان مدفوع للمغاسل',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

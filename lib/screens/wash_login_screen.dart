@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/session_service.dart';
+import '../services/push_notification_service.dart';
 import 'wash_register_screen.dart';
 import 'wash_home_screen.dart';
 import 'admin_screen.dart';
@@ -40,6 +41,11 @@ class _WashLoginScreenState extends State<WashLoginScreen> {
           .get();
 
       if (adminDoc.exists) {
+        await PushNotificationService.registerDevice(
+          userId: uid,
+          userType: 'admin',
+        );
+
         if (!mounted) return;
 
         Navigator.pushReplacement(
@@ -74,6 +80,11 @@ class _WashLoginScreenState extends State<WashLoginScreen> {
 
       SessionService.currentWashId = uid;
       SessionService.currentWashName = data['washName'];
+
+      await PushNotificationService.registerDevice(
+        userId: uid,
+        userType: 'wash',
+      );
 
       if (!mounted) return;
 

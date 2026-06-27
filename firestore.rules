@@ -65,6 +65,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /fcm_tokens/{tokenId} {
+      allow create, update: if signedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow read, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
     match /coupons/{couponId} {
       allow read: if signedIn();
       allow write: if isAdmin();

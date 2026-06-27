@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/firebase_auth_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import 'customer_home_screen.dart';
@@ -81,6 +82,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     SessionService.currentCustomerId = user.uid;
     SessionService.currentCustomerName =
         customerData['fullName']?.toString() ?? '';
+
+    await PushNotificationService.registerDevice(
+      userId: user.uid,
+      userType: 'customer',
+    );
 
     if (!mounted) return;
 

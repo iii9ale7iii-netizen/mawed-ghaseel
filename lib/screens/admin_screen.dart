@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../theme/app_glass_ui.dart';
+import '../main.dart';
+import 'admin_coupons_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_notifications_screen.dart';
-import 'admin_coupons_screen.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -15,18 +17,13 @@ class AdminScreen extends StatelessWidget {
     required String subtitle,
     required IconData icon,
     required Widget screen,
-    Color color = Colors.blue,
   }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppActionCard(
+        title: title,
+        subtitle: subtitle,
+        icon: icon,
         onTap: () {
           Navigator.push(
             context,
@@ -40,16 +37,9 @@ class AdminScreen extends StatelessWidget {
   Widget statusBadge(String status) {
     final isApproved = status == 'approved';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isApproved ? Colors.green : Colors.orange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        isApproved ? 'معتمد' : 'بانتظار الاعتماد',
-        style: const TextStyle(color: Colors.white),
-      ),
+    return AppStatusChip(
+      label: isApproved ? 'معتمدة' : 'بانتظار الاعتماد',
+      color: isApproved ? Colors.green : Colors.orange,
     );
   }
 
@@ -60,19 +50,44 @@ class AdminScreen extends StatelessWidget {
 
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('تم اعتماد المغسلة')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم اعتماد المغسلة')),
+    );
   }
 
   Future<void> deleteWash(BuildContext context, String washId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('حذف المغسلة'),
+            content: const Text('هل أنت متأكد من حذف هذه المغسلة؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('تراجع'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('حذف'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
     await FirebaseFirestore.instance.collection('washes').doc(washId).delete();
 
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('تم حذف المغسلة')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حذف المغسلة')),
+    );
   }
 
   Future<void> logout(BuildContext context) async {
@@ -80,40 +95,46 @@ class AdminScreen extends StatelessWidget {
 
     if (!context.mounted) return;
 
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+      (route) => false,
+    );
   }
 
   Widget washesManagementSection() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('washes').snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('حدث خطأ: ${snapshot.error}'));
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AppLoadingState();
         }
 
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) {
+          return AppEmptyState(
+            title: 'حدث خطأ: ${snapshot.error}',
+            icon: Icons.error_outline_rounded,
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const AppEmptyState(
+            title: 'لا توجد مغاسل مسجلة حالياً',
+            icon: Icons.local_car_wash_outlined,
+          );
         }
 
         final washes = snapshot.data!.docs;
 
-        if (washes.isEmpty) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('لا توجد مغاسل مسجلة حالياً'),
-            ),
-          );
-        }
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'إدارة المغاسل',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+            const AppSectionTitle(
+              title: 'إدارة المغاسل',
+              subtitle: 'اعتماد المغاسل الجديدة أو حذف الحسابات غير المناسبة',
+              icon: Icons.local_car_wash_rounded,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             ...washes.map((wash) {
               final data = wash.data() as Map<String, dynamic>;
               final status = data['status']?.toString() ?? 'pending';
@@ -122,42 +143,72 @@ class AdminScreen extends StatelessWidget {
                   data['name']?.toString() ??
                   'بدون اسم';
               final email = data['email']?.toString() ?? '';
+              final city = data['city']?.toString() ?? '';
+              final washType = data['washType']?.toString() ?? '';
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AppGlassCard(
+                  padding: const EdgeInsets.all(15),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.local_car_wash),
-                        title: Text(
-                          washName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(email),
-                        trailing: statusBadge(status),
+                      Row(
+                        children: [
+                          const AppActionIcon(icon: Icons.storefront_rounded),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  washName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppGlassUi.darkText,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                if (email.isNotEmpty)
+                                  AppInfoRow(
+                                    icon: Icons.email_outlined,
+                                    text: email,
+                                  ),
+                                AppInfoRow(
+                                  icon: Icons.location_city_rounded,
+                                  text: [
+                                    if (city.isNotEmpty) city,
+                                    if (washType.isNotEmpty) washType,
+                                  ].join(' - '),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(child: statusBadge(status)),
+                        ],
                       ),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: status == 'approved'
+                            child: AppGradientButton(
+                              title: 'اعتماد',
+                              icon: Icons.verified_rounded,
+                              onTap: status == 'approved'
                                   ? null
                                   : () => approveWash(context, wash.id),
-                              icon: const Icon(Icons.check),
-                              label: const Text('اعتماد'),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                              onPressed: () => deleteWash(context, wash.id),
-                              icon: const Icon(Icons.delete),
-                              label: const Text('حذف'),
+                            child: AppGradientButton(
+                              title: 'حذف',
+                              icon: Icons.delete_rounded,
+                              danger: true,
+                              onTap: () => deleteWash(context, wash.id),
                             ),
                           ),
                         ],
@@ -177,47 +228,49 @@ class AdminScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('لوحة الأدمن'),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => logout(context),
-            ),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
+      child: AppGlassScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            AppGlassTopBar(
+              title: 'لوحة الأدمن',
+              actions: [
+                AppCircleIconButton(
+                  icon: Icons.logout_rounded,
+                  tooltip: 'تسجيل الخروج',
+                  onTap: () => logout(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const AppSectionTitle(
+              title: 'إدارة التطبيق',
+              subtitle: 'تابع الإحصائيات والإعلانات والكوبونات والمغاسل',
+              icon: Icons.admin_panel_settings_rounded,
+            ),
+            const SizedBox(height: 12),
             adminMenuButton(
               context: context,
               title: 'لوحة الإحصائيات',
-              subtitle: 'إحصائيات العملاء والحجوزات والإعلانات والإيرادات',
-              icon: Icons.dashboard,
+              subtitle: 'ملخص العملاء والحجوزات والإعلانات والإيرادات',
+              icon: Icons.dashboard_rounded,
               screen: const AdminDashboardScreen(),
-              color: Colors.indigo,
             ),
             adminMenuButton(
               context: context,
-              title: 'إدارة الإعلانات',
-              subtitle: 'إضافة وتفعيل وتعطيل الإعلانات الممولة',
-              icon: Icons.campaign,
+              title: 'الإشعارات والإعلانات',
+              subtitle: 'إرسال إشعارات وإدارة الإعلانات الممولة',
+              icon: Icons.campaign_rounded,
               screen: const AdminNotificationsScreen(),
-              color: Colors.orange,
             ),
             adminMenuButton(
               context: context,
-              title: 'إدارة أكواد الخصم',
-              subtitle: 'إضافة وتفعيل وتعطيل أكواد الخصم',
-              icon: Icons.discount,
+              title: 'أكواد الخصم',
+              subtitle: 'إضافة وتفعيل وتعطيل كوبونات الخصم',
+              icon: Icons.discount_rounded,
               screen: const AdminCouponsScreen(),
-              color: Colors.green,
             ),
-
-            const Divider(height: 30),
-
+            const SizedBox(height: 18),
             washesManagementSection(),
           ],
         ),

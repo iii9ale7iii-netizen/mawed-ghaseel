@@ -11,10 +11,12 @@ import 'screens/wash_login_screen.dart';
 
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
+import 'services/push_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await PushNotificationService.initialize();
   runApp(const MawedGhaseelApp());
 }
 

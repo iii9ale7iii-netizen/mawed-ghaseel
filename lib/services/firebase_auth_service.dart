@@ -36,7 +36,24 @@ class FirebaseAuthService {
     required String password,
   }) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final uid = credential.user?.uid;
+
+      if (uid == null) {
+        await _auth.signOut();
+        return 'تعذر قراءة بيانات الحساب';
+      }
+
+      final customerDoc = await _firestore.collection('customers').doc(uid).get();
+
+      if (!customerDoc.exists) {
+        await _auth.signOut();
+        return 'هذا الحساب غير مسجل كعميل. استخدم دخول صاحب المغسلة.';
+      }
 
       return null;
     } catch (e) {

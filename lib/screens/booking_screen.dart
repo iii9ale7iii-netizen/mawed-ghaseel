@@ -360,6 +360,11 @@ class _BookingScreenState extends State<BookingScreen> {
         status == 'ط¸â€¦ط·آ±ط¸ظ¾ط¸ث†ط·آ¶';
   }
 
+  String bookingSlotId() {
+    final raw = '${widget.washId}_${dateController.text}_${timeController.text}';
+    return raw.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+  }
+
   Future<bool> confirmBooking() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -395,6 +400,15 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> saveBooking() async {
+    final customerId = SessionService.currentCustomerId ?? '';
+
+    if (customerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('سجل الدخول كعميل قبل إرسال الحجز')),
+      );
+      return;
+    }
+
     if (dateController.text.isEmpty || timeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى اختيار التاريخ والوقت')),
@@ -422,40 +436,12 @@ class _BookingScreenState extends State<BookingScreen> {
         return;
       }
 
-      final existingBookings = await FirebaseFirestore.instance
-          .collection('bookings')
-          .where('washId', isEqualTo: widget.washId)
-          .where('date', isEqualTo: dateController.text)
-          .where('time', isEqualTo: timeController.text)
-          .get();
+      final bookingRef = FirebaseFirestore.instance.collection('bookings').doc();
+      final slotId = bookingSlotId();
+      final slotRef =
+          FirebaseFirestore.instance.collection('booking_slots').doc(slotId);
 
-      var booked = false;
-
-      for (final doc in existingBookings.docs) {
-        final data = doc.data();
-        final status = data['status']?.toString() ?? '';
-
-        if (!isRejectedStatus(status)) {
-          booked = true;
-          break;
-        }
-      }
-
-      if (!mounted) return;
-
-      if (booked) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('هذا الموعد محجوز مسبقاً')),
-        );
-
-        setState(() {
-          isLoading = false;
-        });
-
-        return;
-      }
-
-      await FirebaseFirestore.instance.collection('bookings').add({
+      final bookingData = {
         'customerId': SessionService.currentCustomerId ?? '',
         'customerName': SessionService.currentCustomerName ?? '',
         'washId': widget.washId,
@@ -467,9 +453,27 @@ class _BookingScreenState extends State<BookingScreen> {
         'couponCode': couponApplied ? appliedCouponCode : '',
         'discountPercentage': couponApplied ? discountPercentage : 0,
         'hasDiscount': couponApplied,
+        'slotId': slotId,
         'createdAt': Timestamp.now(),
-      });
+      };
 
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final slotSnapshot = await transaction.get(slotRef);
+
+        if (slotSnapshot.exists) {
+          throw Exception('هذا الموعد محجوز مسبقا');
+        }
+
+        transaction.set(slotRef, {
+          'customerId': customerId,
+          'washId': widget.washId,
+          'bookingId': bookingRef.id,
+          'date': dateController.text,
+          'time': timeController.text,
+          'createdAt': Timestamp.now(),
+        });
+        transaction.set(bookingRef, bookingData);
+      });
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(

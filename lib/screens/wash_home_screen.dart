@@ -7,6 +7,7 @@ import '../services/booking_status_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_glass_ui.dart';
 import 'service_management_screen.dart';
+import 'wash_location_screen.dart';
 import 'wash_notifications_screen.dart';
 import 'working_hours_screen.dart';
 
@@ -73,6 +74,16 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
         body:
             'تم رفض حجز خدمة $serviceName لدى $washName بتاريخ $date الساعة $time',
       );
+    }
+
+    if (BookingStatusService.isRejected(normalizedStatus)) {
+      final slotId = bookingData['slotId']?.toString() ?? '';
+      if (slotId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('booking_slots')
+            .doc(slotId)
+            .delete();
+      }
     }
 
     if (!mounted) return;
@@ -253,6 +264,20 @@ class _WashHomeScreenState extends State<WashHomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => const WorkingHoursScreen(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        AppActionCard(
+          title: 'موقع المغسلة',
+          subtitle: 'حفظ الموقع ليظهر العملاء المغاسل الأقرب لهم على الخريطة.',
+          icon: Icons.map_rounded,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WashLocationScreen(),
               ),
             );
           },

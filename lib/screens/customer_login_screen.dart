@@ -58,12 +58,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     });
 
     if (result != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('بيانات الدخول غير صحيحة')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result)),
+      );
       return;
     }
-
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {

@@ -57,7 +57,6 @@ class WorkingHoursService {
     if (!doc.exists) return;
 
     final data = doc.data() ?? {};
-
     final updates = <String, dynamic>{};
 
     if (!data.containsKey('bookingEnabled')) {

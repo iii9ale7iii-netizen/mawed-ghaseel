@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/firebase_auth_service.dart';
+import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import 'customer_home_screen.dart';
 import 'customer_register_screen.dart';
@@ -60,6 +62,27 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       ).showSnackBar(const SnackBar(content: Text('بيانات الدخول غير صحيحة')));
       return;
     }
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر قراءة بيانات الحساب')),
+      );
+      return;
+    }
+
+    final customerDoc = await FirebaseFirestore.instance
+        .collection('customers')
+        .doc(user.uid)
+        .get();
+    final customerData = customerDoc.data() ?? {};
+
+    SessionService.currentCustomerId = user.uid;
+    SessionService.currentCustomerName =
+        customerData['fullName']?.toString() ?? '';
+
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,

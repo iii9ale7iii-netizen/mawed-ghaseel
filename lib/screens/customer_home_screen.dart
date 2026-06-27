@@ -205,16 +205,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
         if (ads.isEmpty) return const SizedBox.shrink();
 
+        final visibleAds = ads.take(5).toList();
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionTitle(
-              title: 'عروض ممولة',
-              subtitle: 'اختر العرض المناسب واحجز مباشرة',
+              title: 'عروض مميزة',
+              subtitle: 'عروض مختارة من المغاسل القريبة',
               icon: Icons.campaign_rounded,
             ),
             const SizedBox(height: 12),
-            ...ads.take(5).map((adData) => _paidAdCard(context, adData)),
+            SizedBox(
+              height: 178,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: visibleAds.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _paidAdCard(context, visibleAds[index]);
+                },
+              ),
+            ),
             const SizedBox(height: 4),
           ],
         );
@@ -227,141 +240,133 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final body = adData['body']?.toString().trim() ?? '';
     final washId = adData['washId']?.toString() ?? '';
     final washName = adData['washName']?.toString().trim() ?? 'مغسلة';
-    final startDate = AdsService.formatDate(adData['startAt']);
     final endDate = AdsService.formatDate(adData['endAt']);
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
+    return SizedBox(
+      width: 306,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.88),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.92)),
-              boxShadow: [
-                BoxShadow(
-                  color: _primary.withOpacity(0.08),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: _secondary.withOpacity(0.13),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFD9ECFF)),
+          child: InkWell(
+            onTap: washId.isEmpty
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ServiceSelectionScreen(
+                          washId: washId,
+                          washName: washName,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.local_car_wash_rounded,
-                        color: _primary,
-                        size: 25,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            washName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: _darkText,
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF7E8),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: const Color(0xFFFFCC80),
-                              ),
-                            ),
-                            child: const Text(
-                              'إعلان ممول',
-                              style: TextStyle(
-                                color: Color(0xFFB45309),
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title.isEmpty ? 'عرض خاص' : title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _darkText,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    height: 1.25,
+                    );
+                  },
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.90),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withOpacity(0.92)),
+                boxShadow: [
+                  BoxShadow(
+                    color: _primary.withOpacity(0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
                   ),
-                ),
-                if (body.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: _secondary.withOpacity(0.13),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFD9ECFF)),
+                        ),
+                        child: const Icon(
+                          Icons.local_car_wash_rounded,
+                          color: _primary,
+                          size: 23,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          washName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _darkText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7E8),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: const Color(0xFFFFCC80)),
+                        ),
+                        child: const Text(
+                          'ممّول',
+                          style: TextStyle(
+                            color: Color(0xFFB45309),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Text(
-                    body,
+                    title.isEmpty ? 'عرض خاص' : title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: _mutedText,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      height: 1.35,
+                      color: _darkText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.76),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: const Color(0xFFD9ECFF)),
-                  ),
-                  child: Row(
+                  if (body.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      body,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Row(
                     children: [
                       const Icon(
-                        Icons.date_range_rounded,
-                        size: 17,
+                        Icons.schedule_rounded,
+                        size: 16,
                         color: _primary,
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'مدة العرض: $startDate إلى $endDate',
+                          'ينتهي $endDate',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -371,30 +376,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_back_rounded,
+                        color: _primary,
+                        size: 22,
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                _GradientActionButton(
-                  title: 'احجز الآن',
-                  icon: Icons.arrow_back_rounded,
-                  height: 48,
-                  enabled: washId.isNotEmpty,
-                  onTap: washId.isEmpty
-                      ? null
-                      : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ServiceSelectionScreen(
-                                washId: washId,
-                                washName: washName,
-                              ),
-                            ),
-                          );
-                        },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

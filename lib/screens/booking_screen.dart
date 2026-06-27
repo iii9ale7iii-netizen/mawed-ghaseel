@@ -28,13 +28,44 @@ class _BookingScreenState extends State<BookingScreen> {
 
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
+  Map<String, dynamic>? washData;
 
   bool isLoading = false;
   bool isCheckingCoupon = false;
+  bool isLoadingWash = true;
 
   String appliedCouponCode = '';
   int discountPercentage = 0;
   bool couponApplied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadWashData();
+  }
+
+  Future<void> loadWashData() async {
+    try {
+      final washDoc = await FirebaseFirestore.instance
+          .collection('washes')
+          .doc(widget.washId)
+          .get();
+
+      if (!mounted) return;
+
+      setState(() {
+        washData = washDoc.data() ?? {};
+        isLoadingWash = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        washData = {};
+        isLoadingWash = false;
+      });
+    }
+  }
 
   Future<void> selectDate() async {
     final pickedDate = await showDatePicker(
@@ -50,16 +81,46 @@ class _BookingScreenState extends State<BookingScreen> {
       },
     );
 
-    if (pickedDate != null) {
-      setState(() {
-        selectedDate = pickedDate;
-        dateController.text =
-            '${pickedDate.day}/${pickedDate.month}/${pickedDate.year}';
-      });
+    if (pickedDate == null || !mounted) return;
+
+    setState(() {
+      selectedDate = pickedDate;
+      selectedTime = null;
+      timeController.clear();
+      dateController.text =
+          '${pickedDate.day}/${pickedDate.month}/${pickedDate.year}';
+    });
+
+    if (!isSelectedDayAvailable(pickedDate)) {
+      final dayName = WorkingHoursService.arabicDayName(
+        WorkingHoursService.dayKeyFromDate(pickedDate),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('المغسلة مغلقة يوم $dayName')),
+      );
     }
   }
 
   Future<void> selectTime() async {
+    if (selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اختر التاريخ أولاً ثم اختر الوقت')),
+      );
+      return;
+    }
+
+    if (!isSelectedDayAvailable(selectedDate!)) {
+      final dayName = WorkingHoursService.arabicDayName(
+        WorkingHoursService.dayKeyFromDate(selectedDate!),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('لا يمكن الحجز لأن المغسلة مغلقة يوم $dayName')),
+      );
+      return;
+    }
+
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: selectedTime ?? TimeOfDay.now(),
@@ -71,12 +132,29 @@ class _BookingScreenState extends State<BookingScreen> {
       },
     );
 
-    if (pickedTime != null && mounted) {
-      setState(() {
-        selectedTime = pickedTime;
-        timeController.text = pickedTime.format(context);
-      });
+    if (pickedTime == null || !mounted) return;
+
+    final bookingDateTime = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (!isOpenAt(bookingDateTime)) {
+      final range = workingHoursRangeForDate(bookingDateTime);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('الوقت خارج الدوام. الدوام لهذا اليوم: $range')),
+      );
+      return;
     }
+
+    setState(() {
+      selectedTime = pickedTime;
+      timeController.text = pickedTime.format(context);
+    });
   }
 
   DateTime? selectedBookingDateTime() {
@@ -91,6 +169,73 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  bool isSelectedDayAvailable(DateTime date) {
+    final data = washData ?? {};
+
+    if (!WorkingHoursService.isWashBookingEnabled(data)) return false;
+
+    final workingHours = WorkingHoursService.getWorkingHours(data);
+    final dayKey = WorkingHoursService.dayKeyFromDate(date);
+    final dayDataRaw = workingHours[dayKey];
+
+    if (dayDataRaw is! Map) return false;
+
+    final dayData = Map<String, dynamic>.from(dayDataRaw);
+    return dayData['enabled'] == true;
+  }
+
+  bool isOpenAt(DateTime dateTime) {
+    return WorkingHoursService.isOpenAt(
+      washData: washData ?? {},
+      dateTime: dateTime,
+    );
+  }
+
+  String workingHoursRangeForDate(DateTime date) {
+    final workingHours = WorkingHoursService.getWorkingHours(washData ?? {});
+    final dayKey = WorkingHoursService.dayKeyFromDate(date);
+    final dayDataRaw = workingHours[dayKey];
+
+    if (dayDataRaw is! Map) return 'غير محدد';
+
+    final dayData = Map<String, dynamic>.from(dayDataRaw);
+
+    if (dayData['enabled'] != true) return 'مغلق';
+
+    final from = dayData['from']?.toString() ?? '00:00';
+    final to = dayData['to']?.toString() ?? '00:00';
+    return 'من $from إلى $to';
+  }
+
+  String workingHoursSummary() {
+    if (isLoadingWash) return 'جاري تحميل أوقات العمل...';
+
+    final data = washData ?? {};
+
+    if (!WorkingHoursService.isWashBookingEnabled(data)) {
+      return 'المغسلة لا تستقبل حجوزات حالياً';
+    }
+
+    final workingHours = WorkingHoursService.getWorkingHours(data);
+    final items = <String>[];
+
+    for (final entry in WorkingHoursService.arabicDayNames.entries) {
+      final dayDataRaw = workingHours[entry.key];
+
+      if (dayDataRaw is! Map) continue;
+
+      final dayData = Map<String, dynamic>.from(dayDataRaw);
+      final enabled = dayData['enabled'] == true;
+      final from = dayData['from']?.toString() ?? '00:00';
+      final to = dayData['to']?.toString() ?? '00:00';
+      final value = enabled ? '$from - $to' : 'مغلق';
+
+      items.add('${entry.value}: $value');
+    }
+
+    return items.isEmpty ? 'لم يتم تحديد أوقات العمل' : items.join('\n');
+  }
+
   Future<bool> validateWorkingHours() async {
     final bookingDateTime = selectedBookingDateTime();
 
@@ -101,24 +246,13 @@ class _BookingScreenState extends State<BookingScreen> {
       return false;
     }
 
-    final washDoc = await FirebaseFirestore.instance
-        .collection('washes')
-        .doc(widget.washId)
-        .get();
-
-    if (!washDoc.exists) {
-      if (!mounted) return false;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('المغسلة غير موجودة')),
-      );
-      return false;
+    if (washData == null) {
+      await loadWashData();
     }
 
-    final washData = washDoc.data() ?? {};
-    final bookingEnabled = WorkingHoursService.isWashBookingEnabled(washData);
+    final data = washData ?? {};
 
-    if (!bookingEnabled) {
+    if (!WorkingHoursService.isWashBookingEnabled(data)) {
       if (!mounted) return false;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,26 +261,12 @@ class _BookingScreenState extends State<BookingScreen> {
       return false;
     }
 
-    final workingHours = WorkingHoursService.getWorkingHours(washData);
-    final dayKey = WorkingHoursService.dayKeyFromDate(bookingDateTime);
-    final dayDataRaw = workingHours[dayKey];
-
-    if (dayDataRaw is! Map) {
+    if (!isSelectedDayAvailable(bookingDateTime)) {
       if (!mounted) return false;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا توجد أوقات عمل لهذا اليوم')),
+      final dayName = WorkingHoursService.arabicDayName(
+        WorkingHoursService.dayKeyFromDate(bookingDateTime),
       );
-      return false;
-    }
-
-    final dayData = Map<String, dynamic>.from(dayDataRaw);
-    final dayEnabled = dayData['enabled'] == true;
-
-    if (!dayEnabled) {
-      if (!mounted) return false;
-
-      final dayName = WorkingHoursService.arabicDayName(dayKey);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('المغسلة مغلقة يوم $dayName')),
@@ -154,22 +274,13 @@ class _BookingScreenState extends State<BookingScreen> {
       return false;
     }
 
-    final from = dayData['from']?.toString() ?? '00:00';
-    final to = dayData['to']?.toString() ?? '00:00';
-    final isOpen = WorkingHoursService.isOpenAt(
-      washData: washData,
-      dateTime: bookingDateTime,
-    );
-
-    if (!isOpen) {
+    if (!isOpenAt(bookingDateTime)) {
       if (!mounted) return false;
 
+      final range = workingHoursRangeForDate(bookingDateTime);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'الوقت المختار خارج أوقات العمل. وقت العمل من $from إلى $to',
-          ),
-        ),
+        SnackBar(content: Text('الوقت المختار خارج الدوام. الدوام: $range')),
       );
       return false;
     }
@@ -243,6 +354,46 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  bool isRejectedStatus(String status) {
+    return status == 'مرفوض' ||
+        status == 'ظ…ط±ظپظˆط¶' ||
+        status == 'ط¸â€¦ط·آ±ط¸ظ¾ط¸ث†ط·آ¶';
+  }
+
+  Future<bool> confirmBooking() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تأكيد الحجز'),
+            content: Text(
+              'سيتم إرسال طلب الحجز للمغسلة.\n\n'
+              'المغسلة: ${widget.washName}\n'
+              'الخدمة: ${widget.serviceName}\n'
+              'التاريخ: ${dateController.text}\n'
+              'الوقت: ${timeController.text}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('تراجع'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('إرسال الحجز'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    return confirmed == true;
+  }
+
   Future<void> saveBooking() async {
     if (dateController.text.isEmpty || timeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,6 +401,10 @@ class _BookingScreenState extends State<BookingScreen> {
       );
       return;
     }
+
+    final confirmed = await confirmBooking();
+
+    if (!confirmed || !mounted) return;
 
     try {
       setState(() {
@@ -274,12 +429,13 @@ class _BookingScreenState extends State<BookingScreen> {
           .where('time', isEqualTo: timeController.text)
           .get();
 
-      bool booked = false;
+      var booked = false;
 
       for (final doc in existingBookings.docs) {
         final data = doc.data();
+        final status = data['status']?.toString() ?? '';
 
-        if (data['status'] != 'مرفوض' && data['status'] != 'ظ…ط±ظپظˆط¶') {
+        if (!isRejectedStatus(status)) {
           booked = true;
           break;
         }
@@ -370,6 +526,44 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Widget _workingHoursCard() {
+    return AppGlassCard(
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppActionIcon(icon: Icons.schedule_rounded),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'أوقات عمل المغسلة',
+                  style: TextStyle(
+                    color: AppGlassUi.darkText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  workingHoursSummary(),
+                  style: const TextStyle(
+                    color: AppGlassUi.mutedText,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _couponAppliedCard() {
     return AppGlassCard(
       padding: const EdgeInsets.all(14),
@@ -454,6 +648,8 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
             ),
             const SizedBox(height: 14),
+            _workingHoursCard(),
+            const SizedBox(height: 14),
             AppGlassCard(
               child: Column(
                 children: [
@@ -508,7 +704,7 @@ class _BookingScreenState extends State<BookingScreen> {
             ],
             const SizedBox(height: 18),
             AppGradientButton(
-              title: isLoading ? 'جاري تأكيد الحجز...' : 'تأكيد الحجز',
+              title: isLoading ? 'جاري إرسال الحجز...' : 'إرسال طلب الحجز',
               icon: Icons.check_circle_rounded,
               onTap: isLoading ? null : saveBooking,
             ),

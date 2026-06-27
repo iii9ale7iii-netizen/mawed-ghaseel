@@ -92,6 +92,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     return true;
   }
 
+  int compareBookingsByCreatedAt(
+    QueryDocumentSnapshot first,
+    QueryDocumentSnapshot second,
+  ) {
+    final firstData = first.data() as Map<String, dynamic>;
+    final secondData = second.data() as Map<String, dynamic>;
+    final firstCreatedAt = firstData['createdAt'];
+    final secondCreatedAt = secondData['createdAt'];
+
+    if (firstCreatedAt is Timestamp && secondCreatedAt is Timestamp) {
+      return secondCreatedAt.compareTo(firstCreatedAt);
+    }
+
+    if (firstCreatedAt is Timestamp) return -1;
+    if (secondCreatedAt is Timestamp) return 1;
+    return 0;
+  }
+
 
   String statusLabel(String status) {
     if (isAcceptedStatus(status)) return 'مقبول';
@@ -280,6 +298,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           final status = data['status']?.toString() ?? 'بانتظار الموافقة';
           return matchesStatusFilter(status);
         }).toList();
+
+        bookings.sort(compareBookingsByCreatedAt);
 
         if (bookings.isEmpty) {
           return const AppEmptyState(
